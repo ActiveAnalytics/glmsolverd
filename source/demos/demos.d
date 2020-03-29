@@ -16,8 +16,6 @@ import std.stdio : writeln;
 import std.file: remove;
 import std.parallelism;
 
-/* ldc2 demos.d arrays.d arraycommon.d apply.d link.d distributions.d tools.d linearalgebra.d io.d fit.d -O2 -L-lopenblas -L-lpthread -L-llapacke -L-llapack -L-lm && ./demos */
-
 /* Timed demo for basic observational benchmarking */
 void timed_demo()
 { 
