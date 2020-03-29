@@ -1,7 +1,9 @@
 # glmsolverd
 D Solvers for GLM specializing in calculations on large data sets that do not necessarily fit into memory and minimizing the memory required to run algorithms and using multicores.
 
-This library implements Generalized Linear Models in the D programming language.
+This library implements Generalized Linear Models in the D programming language. It attempts to create a comprehensive library that can handle larger datasets on multicore machines by dividing the computations to blocks that can be carried out in memory (for speed) and on disk (to conserve computational resources). It offers a variety of solvers that gives the user choice, flexibility and control, and also aims to be a fully comprehensive library in terms of post processing and to be comparable in performance with the best open source GLM solver libraries, comprehensive, convenient and simple to install and use.
+
+See `source/demos/demos.d` file for examples of usage.
 
 ## Prerequisites
 
