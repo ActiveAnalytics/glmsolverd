@@ -3,7 +3,7 @@ D Solvers for GLM specializing in calculations on large data sets that do not ne
 
 This library implements Generalized Linear Models in the D programming language. It attempts to create a comprehensive library that can handle larger datasets on multicore machines by dividing the computations to blocks that can be carried out in memory (for speed) and on disk (to conserve computational resources). It offers a variety of solvers that gives the user choice, flexibility and control, and also aims to be a fully comprehensive library in terms of post processing and to be comparable in performance with the best open source GLM solver libraries, comprehensive, convenient and simple to install and use.
 
-See `source/demos/demos.d` file for examples of usage.
+See `source/demos/demos.d` file for examples of usage. To run the package do `dub run`, see the `app.d` file for more details. The package can be configured to a library rather than an executable see [dub](https://dub.pm/package-format-json.html) for the details.
 
 ## Prerequisites
 
