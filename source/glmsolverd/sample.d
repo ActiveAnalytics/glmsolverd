@@ -95,7 +95,7 @@ Matrix!(T, layout) mvrnorm(T, CBLAS_LAYOUT layout = CblasColMajor)
   n = number of samples.
 */
 auto simulateData(T, CBLAS_LAYOUT layout = CblasColMajor)
-  (ulong p, ulong n, ulong seed, T delta = cast(T)(0))
+  (ulong n, ulong p, ulong seed, T delta = cast(T)(0))
 {
   auto corr = randomCorrelationMatrix!(T)(p, seed);
   auto mu = zerosColumn!(T)(p);
@@ -161,24 +161,21 @@ ColumnVector!(T) _sample_poisson(T)(ColumnVector!(T) lambda, ulong seed)
 */
 auto simulateData(T, CBLAS_LAYOUT layout = CblasColMajor)
   (AbstractDistribution!(T) distrib, AbstractLink!(T) link,
-  ulong p, ulong n, ulong seed)
+  ulong n, ulong p, ulong seed)
 {
-  auto Xy = simulateData!(T, layout)(p, n, seed);
+  auto Xy = simulateData!(T, layout)(n, p, seed);
   auto _y = link.linkinv(Xy.eta);
   
   if(distrib.toString() == "PoissonDistribution")
   {
     _y = _sample_poisson(_y, ++seed);
-    //writeln("Length: ", _y.getData);
   }
   
   if(distrib.toString() == "BinomialDistribution")
   {
     Mt19937_64 rng;
     rng.seed(++seed);
-    /* Add extra noise to the data */
     _y = map!((x) => cast(T)(1) * (x > uniform!("()")(cast(T)(0), cast(T)(1), rng)))(_y);
-    //writeln("Length: ", _y.getData);
   }
 
   if(distrib.toString() == "GammaDistribution")

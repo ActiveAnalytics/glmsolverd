@@ -11,9 +11,7 @@ import glmsolverd.io;
 import glmsolverd.fit;
 import glmsolverd.sample;
 
-import std.conv: to;
-import std.stdio : writeln;
-import std.file: remove;
+import std.stdio: writeln;
 import std.parallelism;
 
 /* Timed demo for basic observational benchmarking */
@@ -23,7 +21,7 @@ void timed_demo()
   ulong seed = 3;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double, CblasColMajor)(distrib, link, 60, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   
@@ -53,7 +51,7 @@ void parallelBlockGLMDemo()
   auto seed = 3;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -62,7 +60,7 @@ void parallelBlockGLMDemo()
   seed = 4;
   distrib = new BinomialDistribution!(double)();
   link = new LogitLink!(double)();
-  auto binomialData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto binomialData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto binomialX = binomialData.X;
   auto binomialY = binomialData.y;
   auto binomialBlockX = matrixToBlock(binomialX, 10);
@@ -71,7 +69,7 @@ void parallelBlockGLMDemo()
   seed = 5;
   distrib = new GaussianDistribution!(double)();
   link = new IdentityLink!(double)();
-  auto gaussianData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gaussianData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gaussianX = gaussianData.X;
   auto gaussianY = gaussianData.y;
   auto gaussianBlockX = matrixToBlock(gaussianX, 10);
@@ -80,7 +78,14 @@ void parallelBlockGLMDemo()
   seed = 6;
   distrib = new PoissonDistribution!(double)();
   link = new LogLink!(double)();
-  auto poissonData = simulateData!(double)(distrib, link, 5, 100, seed);
+
+  //import std.datetime.stopwatch : AutoStart, StopWatch;
+  //auto sw = StopWatch(AutoStart.no);
+  //sw.start();
+  auto poissonData = simulateData!(double)(distrib, link, 10_000, 30, seed);
+  //sw.stop();
+  //writeln("Poisson sample time(ms): ", sw.peek.total!"msecs");
+
   auto poissonX = poissonData.X;
   auto poissonY = poissonData.y;
   auto poissonBlockX = matrixToBlock(poissonX, 10);
@@ -150,7 +155,7 @@ void gdDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   //writeln("Converting matrix to block matrices");
@@ -195,7 +200,7 @@ void gdMomentumDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   //writeln("Converting matrix to block matrices");
@@ -236,7 +241,7 @@ void gdMomentumDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   //writeln("Converting matrix to block matrices");
@@ -276,7 +281,7 @@ void gdNesterovDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -323,7 +328,7 @@ void gdAdagradDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -385,7 +390,7 @@ void gdAdadeltaDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -447,7 +452,7 @@ void gdRMSPropDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -509,7 +514,7 @@ void gdAdamDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -571,7 +576,7 @@ void gdAdaMaxDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -633,7 +638,7 @@ void gdNAdamDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -696,7 +701,7 @@ void gdAMSGradDataDemo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
   auto gammaBlockX = matrixToBlock(gammaX, 10);
@@ -760,19 +765,19 @@ void glm_demo()
   auto seed = 4;
   AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
   AbstractLink!(double) link = new LogLink!(double)();
-  auto gammaData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto gammaX = gammaData.X;
   auto gammaY = gammaData.y;
 
   distrib = new BinomialDistribution!(double)();
   link = new LogitLink!(double)();
-  auto binomialData = simulateData!(double)(distrib, link, 30, 10_000, seed);
+  auto binomialData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto binomialX = binomialData.X;
   auto binomialY = binomialData.y;
 
   distrib = new PoissonDistribution!(double)();
   link = new LogLink!(double)();
-  auto poissonData = simulateData!(double)(distrib, link, 5, 100, seed);
+  auto poissonData = simulateData!(double)(distrib, link, 10_000, 30, seed);
   auto poissonX = poissonData.X;
   auto poissonY = poissonData.y;
   
