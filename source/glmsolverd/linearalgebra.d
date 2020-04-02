@@ -16,7 +16,7 @@ import std.typecons: Tuple, tuple;
 import std.traits: isFloatingPoint, isIntegral, isNumeric;
 
 import std.parallelism;
-import std.range : iota;
+import std.range: iota;
 import std.math: pow, fmax;
 alias fmax max;
 

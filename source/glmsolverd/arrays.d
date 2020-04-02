@@ -247,7 +247,7 @@ mixin template MatrixGubbings(T, CBLAS_LAYOUT L)
     {
       return dim.dup;
     }
-    /* Returns transposed matrix no duplication */
+    /* Returns transposed matrix (duplicated) */
     Matrix!(T, L) t()
     {
       auto ddat = data.dup;
@@ -286,6 +286,124 @@ mixin template MatrixGubbings(T, CBLAS_LAYOUT L)
       assert(ncol == 1, "The number of columns in the matrix
            is not == 1 and so can not be converted to a matrix.");
       return new RowVector!(T)(data);
+    }
+    /* Appends Vector to the END of the matrix */
+    void appendColumn(T[] rhs)
+    {
+      assert(rhs.length == nrow,
+        "Vector is not of the same length as number of rows.");
+      static if(L == CblasColMajor)
+      {
+        data ~= rhs;
+        dim[1] += 1;
+      } else {
+        dim[1] += 1;
+        auto ni = dim[0]*dim[1];
+        T[] _data = new T[ni];
+        ulong i, j, k = 0;
+        while(i < ni)
+        {
+          auto imod = (i + 1) % nrow;
+          if(imod != 0)
+          {
+            _data[i] = data[k];
+            ++k;
+          }else{
+            _data[i] = rhs[j];
+            ++j;
+          }
+          ++i;
+        }
+        data = _data;
+      }
+      return;
+    }
+    void appendColumn(Vector!(T) rhs)
+    {
+      appendColumn(rhs.getData);
+      return;
+    }
+    void appendColumn(Matrix!(T) rhs)
+    {
+      assert((rhs.nrow == 1) | (rhs.ncol == 1), 
+        "Matrix does not have 1 row or 1 column");
+      appendColumn(rhs.getData);
+    }
+    void appendColumn(T _rhs)
+    {
+      auto rhs = new T[nrow];
+      rhs[] = _rhs;
+      appendColumn(rhs);
+    }
+    /* Prepends Column Vector to the START of the matrix */
+    void prependColumn(T[] rhs)
+    {
+      assert(rhs.length == nrow,
+        "Vector is not of the same length as  number of rows.");
+      static if(L == CblasColMajor)
+      {
+        data = rhs ~ data;
+        dim[1] += 1;
+      } else {
+        dim[1] += 1;
+        auto ni = dim[0]*dim[1];
+        T[] _data = new T[ni];
+        ulong i, j, k = 0;
+        while(i < ni)
+        {
+          auto imod = (i + 1) % nrow;
+          if(imod != 1)
+          {
+            _data[i] = data[k];
+            ++k;
+          }else{
+            _data[i] = rhs[j];
+            ++j;
+          }
+          ++i;
+        }
+        data = _data;
+      }
+      return;
+    }
+    void prependColumn(Vector!(T) rhs)
+    {
+      prependColumn(rhs.getData);
+      return;
+    }
+    void prependColumn(Matrix!(T) rhs)
+    {
+      assert((rhs.nrow == 1) | (rhs.ncol == 1), 
+        "Matrix does not have 1 row or 1 column");
+      prependColumn(rhs.getData);
+    }
+    void prependColumn(T _rhs)
+    {
+      auto rhs = new T[nrow];
+      rhs[] = _rhs;
+      prependColumn(rhs);
+    }
+    auto columnSelect(ulong start, ulong end)
+    {
+      assert(end > start, "Starting column is not less than end column");
+      ulong nCol = end - start;
+      auto arr = new T[nrow * nCol];
+      auto startIndex = start*nrow;
+      ulong iStart = 0;
+      static if(L == CblasColMajor)
+      {
+        for(ulong i = 0; i < nCol; ++i)
+        {
+          //ulong j = start + i;
+          //arr[i*nrow..((i + 1)*nrow)] = data[j*nrow..((j + 1)*nrow)];
+          arr[iStart..((iStart + nrow))] = data[startIndex..(startIndex + nrow)];
+          startIndex += nrow;
+          iStart += nrow;
+        }
+      }else{
+        assert(0, "CblasRowMajor not yet implemented.");
+      }
+      return new Matrix!(T, L)(arr, [nrow, nCol]);
     }
 }
 /* Assuming column major */

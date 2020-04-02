@@ -4,13 +4,13 @@
 module glmsolverd.fit;
 
 import std.conv: to;
-import std.stdio : writeln;
+import std.stdio: writeln;
 import std.traits: isFloatingPoint, isIntegral, isNumeric;
 
 import std.parallelism;
-import std.range : iota;
+import std.range: iota;
 
-import std.math : pow;
+import std.math: pow;
 import std.algorithm: min, max;
 
 import glmsolverd.arrays;

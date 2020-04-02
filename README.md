@@ -84,12 +84,13 @@ can be tried out. Link Functions:
   data dependancy.
   - [x] viii.  Data synthesis and library consolidation.
   - [ ] ix. Implement L-BFGS solver options.
-  - [ ] x. Include a sparse solver?
-  - [ ] xi. Is there a case for substituting D's `new T[]` notation for
+  - [ ] x. Implement full Row Major features for matrix.
+  - [ ] xi. Include a sparse solver?
+  - [ ] xii. Is there a case for substituting D's `new T[]` notation for
   the initialiaztion used [here](https://gist.github.com/dataPulverizer/4897b01a8cb501eae8107c4220e36a82) which is faster for initilizations especially for non default values and can be parallelised.
-  - [ ] xii. Step control exceeding should not result in failure but exiting
+  - [ ] xiii. Step control exceeding should not result in failure but exiting
   with non convergence and a printed message.
-  - [ ] xiii. Code refactoring.
+  - [ ] xiv. Code refactoring.
 - [ ] 3. Implement memory and disk blocked matrix structure in and
          integrate them with your current algorithm. Creating a generic interface that could contend with any data structure with the right methods returning the right types to the function(s).
 - [ ] 4. Implement or adapt the current GLM algorithm to work with the memory and disk based blocked matrix data structures - Done for memory.
