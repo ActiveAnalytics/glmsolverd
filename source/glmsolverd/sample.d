@@ -119,7 +119,7 @@ auto simulateData(T, CBLAS_LAYOUT layout = CblasColMajor)
   }
 
   auto eta = mult_(X, b);
-  T sd = 0.5 * abs(mean(eta.getData));
+  T sd = 0.5 * abs(mean(eta.array));
   eta += delta + (sd * sampleStandardNormal!(T)(n, ++seed));
 
   return tuple!("X", "eta")(X, eta);
@@ -183,7 +183,7 @@ auto simulateData(T, CBLAS_LAYOUT layout = CblasColMajor)
     _y += 10;
   }
   
-  auto y = new Matrix!(T, layout)(_y.getData, [n, cast(ulong)1]);
+  auto y = new Matrix!(T, layout)(_y.array, [n, cast(ulong)1]);
 
   return tuple!("X", "y")(Xy.X, y);
 }

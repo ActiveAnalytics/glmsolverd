@@ -182,7 +182,7 @@ RowVector!T map(alias fun, T)(RowVector!T v)
 /* Map a function over a matrix */
 Matrix!(T, layout) map(alias fun, T, layout)(Matrix!(T, layout) mat)
 {
-  auto data = mat.getData;
+  auto data = mat.array;
   auto ret = new T[length(data)];
   for(int i = 0; i < length(ret); ++i)
     ret[i] = fun(data[i]);
@@ -192,7 +192,7 @@ Matrix!(T, layout) map(alias fun, T, layout)(Matrix!(T, layout) mat)
 /* This is an inplace map */
 Matrix!(T, layout) imap(alias fun, T, CBLAS_LAYOUT layout)(ref Matrix!(T, layout) mat)
 {
-  auto data = mat.getData;
+  auto data = mat.array;
   for(int i = 0; i < data.length; ++i)
     data[i] = fun(data[i]);
   mat = new Matrix!(T, layout)(data, mat.size);//incase

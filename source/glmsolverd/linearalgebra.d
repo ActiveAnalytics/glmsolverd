@@ -197,7 +197,7 @@ double norm(int incr = 1)(double[] x)
 double norm(T, int incr = 1)(ColumnVector!T x)
 if(is(T == double))
 {
-  return cblas_dnrm2(cast(int)x.length, x.getData.ptr , incr);
+  return cblas_dnrm2(cast(int)x.length, x.array.ptr , incr);
 }
 double norm(T, int incr = 1)(ColumnVector!T x)
 if((!is(T == double)) && isNumeric!T)
@@ -237,7 +237,7 @@ if(isFloatingPoint!T)
   ldc = layout == CblasColMajor ? m : n;
 
   dgemm(layout, transA, transB, m, n,
-        k, alpha, a.getData.ptr, lda, b.getData.ptr, ldb,
+        k, alpha, a.array.ptr, lda, b.array.ptr, ldb,
         beta, c.ptr, ldc);
   
   return new Matrix!(T, layout)(c, [m, n]);
@@ -260,8 +260,8 @@ if(isFloatingPoint!T)
   
   y.length = transA == CblasNoTrans ? m : n;
   
-  dgemv(layout, transA, m, n, alpha, a.getData.ptr, lda, 
-    x.getData.ptr, incx, beta, y.ptr, incy);
+  dgemv(layout, transA, m, n, alpha, a.array.ptr, lda, 
+    x.array.ptr, incx, beta, y.ptr, incy);
 
   return new ColumnVector!(T)(y);
 }
@@ -273,7 +273,7 @@ auto eigen(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A)
 {
   int n = cast(int)A.nrow;
   int lda = n;
-  T[] a = A.getData.dup;
+  T[] a = A.array.dup;
   T[] w = new T[n];
   
   int info = syev(layout, 'V', 'U', n, a.ptr, lda, w.ptr);
@@ -292,7 +292,7 @@ auto eigenGeneral(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A)
   int lda = n; int ldvl = n;
   int ldvr = n;
 
-  T[] a = A.getData.dup;
+  T[] a = A.array.dup;
   T[] wr = new T[n];
   T[] wi = new T[n];
   T[] vl = new T[ldvl*n];
@@ -310,7 +310,7 @@ auto eigenGeneralX(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A)
   int lda = n; int ldvl = n;
   int ldvr = n;
 
-  T[] a = A.getData.dup;
+  T[] a = A.array.dup;
   T[] wr = new T[n];
   T[] wi = new T[n];
   T[] vl = new T[ldvl*n];
@@ -335,7 +335,7 @@ auto eigenGeneralX(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A)
 Matrix!(T, layout) cholesky(char uplo = 'L', T, CBLAS_LAYOUT layout)(Matrix!(T, layout) mat){
 	int p = cast(int)mat.nrow;
 	int[] ipiv; ipiv.length = p;
-  T[] data = mat.getData.dup;
+  T[] data = mat.array.dup;
   
   int info = potrf(layout, uplo, p, data.ptr, p);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ " from function potrf");
@@ -379,8 +379,8 @@ ColumnVector!(T) solve(CBLAS_SYMMETRY symmetry = CblasGeneral, T, CBLAS_LAYOUT l
   
 	int p = cast(int)mat.nrow;
 	int[] ipiv = new int[p];// ipiv.length = p;
-  double[] b = v.getData.dup;
-  T[] data = mat.getData.dup;
+  double[] b = v.array.dup;
+  T[] data = mat.array.dup;
   
   int info;
   static if(symmetry == CblasGeneral)
@@ -407,7 +407,7 @@ alias _solve = solve;
 Matrix!(T, layout) inv(CBLAS_SYMMETRY symmetry = CblasGeneral, T, CBLAS_LAYOUT layout)(Matrix!(T, layout) mat){
 	int p = cast(int)mat.nrow;
 	int[] ipiv; ipiv.length = p;
-  T[] data = mat.getData.dup;
+  T[] data = mat.array.dup;
   
   int info;
   static if(symmetry == CblasGeneral)
@@ -441,7 +441,7 @@ Matrix!(T, layout) inv(CBLAS_SYMMETRY symmetry = CblasGeneral, T, CBLAS_LAYOUT l
 Matrix!(T, layout) pinv(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) mat)
 {
   assert(mat.nrow == mat.ncol, "Number of rows and columns of the matrix are not equal.");
-	double[] a = mat.getData.dup;
+	double[] a = mat.array.dup;
   int m = cast(int)mat.nrow;
   int info = 0; 
   auto s = new double[m];
@@ -492,7 +492,7 @@ auto qrls(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   int m = cast(int)X.nrow;
   int n = cast(int)X.ncol;
   assert(m > n, "Number of rows is less than the number of columns.");
-  auto a = X.getData.dup;
+  auto a = X.array.dup;
   T[] tau = new T[n];
   int lda = layout == CblasColMajor ? m : n;
   int info = dgeqrf(layout, m, n, a.ptr, lda, tau.ptr);
@@ -510,7 +510,7 @@ auto qrls(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   
   ColumnVector!(T) z = mult_!(T, layout, CblasTrans)(Q, y);
   //writeln("z: \n", z);
-  info = dtrtrs(layout, 'U', 'N', 'N', n, 1, R.getData.ptr, n , z.getData.ptr, n);
+  info = dtrtrs(layout, 'U', 'N', 'N', n, 1, R.array.ptr, n , z.array.ptr, n);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ " from function LAPACKE_dtrtrs");
   //ColumnVector!(T) coef = solve(R, z);
   
@@ -525,10 +525,10 @@ auto qrls2(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   int m = cast(int)X.nrow;
   int n = cast(int)X.ncol;
   assert(m > n, "Number of rows is less than the number of columns.");
-  auto a = X.getData.dup;
+  auto a = X.array.dup;
   T[] tau = new T[n];
   int lda = layout == CblasColMajor ? m : n;
-  int info = gels(layout, 'N', m, n, 1, a.ptr, lda, y.getData.ptr, m);
+  int info = gels(layout, 'N', m, n, 1, a.ptr, lda, y.array.ptr, m);
   //int info = dgeqrf(layout, m, n, a.ptr, lda, tau.ptr);
   
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
@@ -536,7 +536,7 @@ auto qrls2(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   //writeln("tau:", tau);
   auto Q = matrix(a, [m, n]);
   auto R = qrToR(Q);
-  auto coef = new ColumnVector!(T)(y.getData[0..n]);
+  auto coef = new ColumnVector!(T)(y.array[0..n]);
     
   return tuple!("coef", "R")(coef, R);
 }
@@ -620,7 +620,7 @@ class GETRIInverse(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractInverse!(T, 
   {
     int p = cast(int)A.nrow;
 	  auto ipiv = new int[p];
-    auto a = A.getData.dup;
+    auto a = A.array.dup;
 
     int info = getrf(layout, p, p, a.ptr, p, ipiv.ptr);
 	  assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ " from function getrf");
@@ -637,7 +637,7 @@ class POTRIInverse(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractInverse!(T, 
   {
     int p = cast(int)A.nrow;
 	  auto ipiv = new int[p];
-    auto a = A.getData.dup;
+    auto a = A.array.dup;
 
     int info = potrf(layout, 'U', p, a.ptr, p);
 	  assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ " from function potrf");
@@ -662,7 +662,7 @@ class SYTRIInverse(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractInverse!(T, 
   {
     int p = cast(int)A.nrow;
 	  auto ipiv = new int[p];
-    auto a = A.getData.dup;
+    auto a = A.array.dup;
 
     int info = sytrf(layout, 'U', p, a.ptr, p, ipiv.ptr);
 	  assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ " from function sytrf");
@@ -686,7 +686,7 @@ class SVDInverse(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractInverse!(T, la
   Matrix!(T, layout) inv(Matrix!(T, layout) A)
   {
     assert(A.nrow == A.ncol, "Number of rows and columns of the matrix are not equal.");
-	  auto a = A.getData.dup;
+	  auto a = A.array.dup;
     int m = cast(int)A.nrow;
     int info = 0; 
     auto s = new double[m];
@@ -856,17 +856,17 @@ auto _gels_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   int m = cast(int)X.nrow;
   int n = cast(int)X.ncol;
   assert(m > n, "Number of rows is less than the number of columns.");
-  auto a = X.getData.dup;
+  auto a = X.array.dup;
   T[] tau = new T[n];
   int lda = layout == CblasColMajor ? m : n;
-  int info = gels(layout, 'N', m, n, 1, a.ptr, lda, y.getData.ptr, m);
+  int info = gels(layout, 'N', m, n, 1, a.ptr, lda, y.array.ptr, m);
   
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function gels");
   //writeln("tau:", tau);
   auto Q = matrix(a, [m, n]);
   auto R = qrToR(Q);
-  auto coef = new ColumnVector!(T)(y.getData[0..n]);
+  auto coef = new ColumnVector!(T)(y.array[0..n]);
     
   return tuple!("coef", "R")(coef, R);
 }
@@ -933,20 +933,20 @@ auto _gelsy_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   int m = cast(int)X.nrow;
   int n = cast(int)X.ncol;
   assert(m > n, "Number of rows is less than the number of columns.");
-  auto a = X.getData.dup;
+  auto a = X.array.dup;
   T[] tau = new T[n];
   int lda = layout == CblasColMajor ? m : n;
 
   int rank = 0; T rcond = 0; auto jpvt = new int[n];
   int ldb = m;
   
-  //int info = gels(layout, 'N', m, n, 1, a.ptr, lda, y.getData.ptr, m);
-  int info = gelsy(layout, m, n, 1, a.ptr, lda, y.getData.ptr, 
+  //int info = gels(layout, 'N', m, n, 1, a.ptr, lda, y.array.ptr, m);
+  int info = gelsy(layout, m, n, 1, a.ptr, lda, y.array.ptr, 
               ldb, jpvt.ptr, rcond, &rank);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function gelsy");
     
-  return new ColumnVector!(T)(y.getData[0..n]);
+  return new ColumnVector!(T)(y.array[0..n]);
 }
 /*
   GELSY Solver Using Orthogonal Factorization
@@ -1020,19 +1020,19 @@ auto _gelss_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   int m = cast(int)X.nrow;
   int n = cast(int)X.ncol;
   assert(m > n, "Number of rows is less than the number of columns.");
-  auto a = X.getData.dup;
+  auto a = X.array.dup;
   T[] tau = new T[n];
   int lda = layout == CblasColMajor ? m : n;
 
   int rank = 0; double rcond = 0; int ldb = m; auto s = new T[n];
   
-  int info = gelss(layout, m, n, 1, a.ptr, lda, y.getData.ptr,
+  int info = gelss(layout, m, n, 1, a.ptr, lda, y.array.ptr,
                 ldb, s.ptr, rcond, &rank);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function gelss");
   
   auto Vt = getV(matrix(a, [m, n]));
-  auto coef = new ColumnVector!(T)(y.getData[0..n]);
+  auto coef = new ColumnVector!(T)(y.array[0..n]);
   /* Inverse of Sigma */
   auto isigma = columnVector(map!( (T x ) => x^^-1 )(s));
   /* Inverse transpose of V */
@@ -1094,18 +1094,18 @@ auto _gelsd_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) X, ColumnVector!(T) y)
   int m = cast(int)X.nrow;
   int n = cast(int)X.ncol;
   assert(m > n, "Number of rows is less than the number of columns.");
-  auto a = X.getData.dup;
+  auto a = X.array.dup;
   T[] tau = new T[n];
   int lda = layout == CblasColMajor ? m : n;
 
   int rank = 0; double rcond = 0; int ldb = m; auto s = new T[n];
   
-  int info = gelsd(layout, m, n, 1, a.ptr, lda, y.getData.ptr,
+  int info = gelsd(layout, m, n, 1, a.ptr, lda, y.array.ptr,
                 ldb, s.ptr, rcond, &rank);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function gelsd");
   /* Returns the coefficients */
-  return new ColumnVector!(T)(y.getData[0..n]);
+  return new ColumnVector!(T)(y.array[0..n]);
 }
 /* GELSD Divide and Conquer SVD Solver */
 class GELSDSolver(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractSolver!(T, layout)
@@ -1163,10 +1163,10 @@ auto _gesv_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A, ColumnVector!(T) b)
   int m = cast(int)A.nrow;
   int n = cast(int)A.ncol;
   assert(m == n, "Matrix must be square.");
-  auto a = A.getData.dup; int nrhs = 1;
+  auto a = A.array.dup; int nrhs = 1;
   int lda = n; int ldb = n; auto ipiv = new int[n];
   
-  int info = gesv(layout, n, nrhs, a.ptr, lda, ipiv.ptr, b.getData.ptr, ldb);
+  int info = gesv(layout, n, nrhs, a.ptr, lda, ipiv.ptr, b.array.ptr, ldb);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function gesv");
   /* Returns b which is overwritten by coefficients */
@@ -1270,10 +1270,10 @@ auto _posv_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A, ColumnVector!(T) b)
   int m = cast(int)A.nrow;
   int n = cast(int)A.ncol;
   assert(m == n, "Matrix must be square.");
-  auto a = A.getData.dup; int nrhs = 1; int lda = n;
+  auto a = A.array.dup; int nrhs = 1; int lda = n;
   int ldb = n;
   
-  int info = posv(layout, 'U', n, nrhs, a.ptr, lda, b.getData.ptr, ldb);
+  int info = posv(layout, 'U', n, nrhs, a.ptr, lda, b.array.ptr, ldb);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function posv");
   /* Returns b which is overwritten by coefficients */
@@ -1377,10 +1377,10 @@ auto _sysv_(T, CBLAS_LAYOUT layout)(Matrix!(T, layout) A, ColumnVector!(T) b)
   int m = cast(int)A.nrow;
   int n = cast(int)A.ncol;
   assert(m == n, "Matrix must be square.");
-  auto a = A.getData.dup; int nrhs = 1; int lda = n;
+  auto a = A.array.dup; int nrhs = 1; int lda = n;
   int ldb = n; auto ipiv = new int[n];
   
-  int info = sysv(layout, 'U', n, nrhs, a.ptr, lda, ipiv.ptr, b.getData.ptr, ldb);
+  int info = sysv(layout, 'U', n, nrhs, a.ptr, lda, ipiv.ptr, b.array.ptr, ldb);
   assert(info == 0, "Illegal value info " ~ to!(string)(info) ~ 
                     " from function sysv");
   /* Returns b which is overwritten by coefficients */
@@ -1482,7 +1482,7 @@ class SYSVSolver(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractSolver!(T, lay
 interface AbstractGradientSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
 {
   private:
-  ColumnVector!(T) pgradient_(AbstractDistribution!T distrib, AbstractLink!T link,
+  ColumnVector!(T) gradient_(AbstractDistribution!T distrib, AbstractLink!T link,
       ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu, 
       ColumnVector!T eta);
 
@@ -1499,13 +1499,13 @@ interface AbstractGradientSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
   /* Gradients */
 
   /* Returns the average gradient calculated using (n - p) */
-  ColumnVector!(T) pgradient(AbstractDistribution!T distrib, AbstractLink!T link,
+  ColumnVector!(T) gradient(AbstractDistribution!T distrib, AbstractLink!T link,
               ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
               ColumnVector!T eta);
-  ColumnVector!(T) pgradient(AbstractDistribution!T distrib, AbstractLink!T link, 
+  ColumnVector!(T) gradient(AbstractDistribution!T distrib, AbstractLink!T link, 
               BlockColumnVector!(T) y, BlockMatrix!(T, layout) x,
               BlockColumnVector!(T) mu, BlockColumnVector!T eta);
-  ColumnVector!(T) pgradient(Block1DParallel dataType, AbstractDistribution!T distrib,
+  ColumnVector!(T) gradient(Block1DParallel dataType, AbstractDistribution!T distrib,
               AbstractLink!T link, BlockColumnVector!(T) y, 
               BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
               BlockColumnVector!T eta);
@@ -1547,7 +1547,7 @@ mixin template GradientMixin(T, CBLAS_LAYOUT layout)
 {
   private:
   
-  auto /* Tuple!(T, ColumnVector!(T)) */ pgradient_(AbstractDistribution!T distrib, AbstractLink!T link,
+  auto /* Tuple!(T, ColumnVector!(T)) */ gradient_(AbstractDistribution!T distrib, AbstractLink!T link,
       ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu, 
       ColumnVector!T eta)
   {
@@ -1573,18 +1573,18 @@ mixin template GradientMixin(T, CBLAS_LAYOUT layout)
   public:
   /* Gradients */
   /* Returns the average gradient calculated using (n - p) */
-  ColumnVector!(T) pgradient(AbstractDistribution!T distrib, AbstractLink!T link,
+  ColumnVector!(T) gradient(AbstractDistribution!T distrib, AbstractLink!T link,
               ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
               ColumnVector!T eta)
   {
     ulong p = x.ncol; ulong n = x.nrow;
-    auto grad = pgradient_(distrib, link, y, x, mu, eta);
+    auto grad = gradient_(distrib, link, y, x, mu, eta);
     auto df = cast(T)(n - p);
     assert(df > 0, "Number of items n is not greater than the number of parameters p.");
     T phi = grad.X2/df;
     return grad.grad/phi;
   }
-  ColumnVector!(T) pgradient(AbstractDistribution!T distrib, AbstractLink!T link, 
+  ColumnVector!(T) gradient(AbstractDistribution!T distrib, AbstractLink!T link, 
               BlockColumnVector!(T) y, BlockMatrix!(T, layout) x,
               BlockColumnVector!(T) mu, BlockColumnVector!T eta)
   {
@@ -1595,7 +1595,7 @@ mixin template GradientMixin(T, CBLAS_LAYOUT layout)
     for(ulong i = 0; i < nBlocks; ++i)
     {
       n += y[i].length;
-      auto tmp = pgradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
+      auto tmp = gradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
       grad += tmp.grad;
       X2 += tmp.X2;
     }
@@ -1604,7 +1604,7 @@ mixin template GradientMixin(T, CBLAS_LAYOUT layout)
     assert(df > 0, "Number of items n is not greater than the number of parameters p.");
     return grad/phi;
   }
-  ColumnVector!(T) pgradient(Block1DParallel dataType, AbstractDistribution!T distrib,
+  ColumnVector!(T) gradient(Block1DParallel dataType, AbstractDistribution!T distrib,
               AbstractLink!T link, BlockColumnVector!(T) y, 
               BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
               BlockColumnVector!T eta)
@@ -1620,7 +1620,7 @@ mixin template GradientMixin(T, CBLAS_LAYOUT layout)
     foreach(i; taskPool.parallel(iota(nBlocks)))
     {
       nStore.get += y[i].length;
-      auto tmp = pgradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
+      auto tmp = gradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
       gradStore.get += tmp.grad;
       X2Store.get += tmp.X2;
     }
@@ -1721,7 +1721,7 @@ mixin template GradientMixin0(T, CBLAS_LAYOUT layout)
     it should be a constant. Might add the actual gradient function later
     for comparison.
   */
-  ColumnVector!(T) pgradient_(AbstractDistribution!T distrib, AbstractLink!T link,
+  ColumnVector!(T) gradient_(AbstractDistribution!T distrib, AbstractLink!T link,
       ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu, 
       ColumnVector!T eta)
   {
@@ -1743,17 +1743,17 @@ mixin template GradientMixin0(T, CBLAS_LAYOUT layout)
   public:
   /* Gradients */
   /* Returns the average gradient calculated using (n - p) */
-  ColumnVector!(T) pgradient(AbstractDistribution!T distrib, AbstractLink!T link,
+  ColumnVector!(T) gradient(AbstractDistribution!T distrib, AbstractLink!T link,
               ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
               ColumnVector!T eta)
   {
     ulong p = x.ncol;
     ulong n = x.nrow;
-    auto grad = pgradient_(distrib, link, y, x, mu, eta);
+    auto grad = gradient_(distrib, link, y, x, mu, eta);
     assert(n > p, "Number of items n is not greater than the number of parameters p.");
     return grad/cast(T)(n - p);
   }
-  ColumnVector!(T) pgradient(AbstractDistribution!T distrib, AbstractLink!T link, 
+  ColumnVector!(T) gradient(AbstractDistribution!T distrib, AbstractLink!T link, 
               BlockColumnVector!(T) y, BlockMatrix!(T, layout) x,
               BlockColumnVector!(T) mu, BlockColumnVector!T eta)
   {
@@ -1763,12 +1763,12 @@ mixin template GradientMixin0(T, CBLAS_LAYOUT layout)
     for(ulong i = 0; i < nBlocks; ++i)
     {
       n += y[i].length;
-      grad += pgradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
+      grad += gradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
     }
     assert(n > p, "Number of items n is not greater than the number of parameters p.");
     return grad/cast(T)(n - p);
   }
-  ColumnVector!(T) pgradient(Block1DParallel dataType, AbstractDistribution!T distrib,
+  ColumnVector!(T) gradient(Block1DParallel dataType, AbstractDistribution!T distrib,
               AbstractLink!T link, BlockColumnVector!(T) y, 
               BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
               BlockColumnVector!T eta)
@@ -1782,7 +1782,7 @@ mixin template GradientMixin0(T, CBLAS_LAYOUT layout)
     foreach(i; taskPool.parallel(iota(nBlocks)))
     {
       nStore.get += y[i].length;
-      gradStore.get += pgradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
+      gradStore.get += gradient_(distrib, link, y[i], x[i], mu[i], eta[i]);
     }
 
     ulong n = 0;
@@ -1886,7 +1886,7 @@ mixin template GradientSolverMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     coef += learningRate * grad;
   }
   /* Solver for blocked matrices/vectors */
@@ -1895,7 +1895,7 @@ mixin template GradientSolverMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     coef += learningRate * grad;
   }
   /* Solver for parallel blocked matrices/vectors */
@@ -1904,7 +1904,7 @@ mixin template GradientSolverMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     coef += learningRate * grad;
   }
   immutable(string) name()
@@ -1949,7 +1949,7 @@ mixin template MomentumMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     delta = momentum*delta + learningRate*grad;
     coef += delta;
   }
@@ -1959,7 +1959,7 @@ mixin template MomentumMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     delta = momentum*delta + learningRate*grad;
     coef += delta;
   }
@@ -1969,7 +1969,7 @@ mixin template MomentumMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     delta = momentum*delta + learningRate*grad;
     coef += delta;
   }
@@ -2017,7 +2017,7 @@ mixin template NesterovMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     delta = momentum*delta + learningRate*grad;
     coef += delta;
   }
@@ -2027,7 +2027,7 @@ mixin template NesterovMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     delta = momentum*delta + learningRate*grad;
     coef += delta;
   }
@@ -2037,7 +2037,7 @@ mixin template NesterovMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     delta = momentum*delta + learningRate*grad;
     coef += delta;
   }
@@ -2088,7 +2088,7 @@ mixin template AdagradMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     G += (coef^^2);
     coef += (learningRate*grad)/((G + epsilon)^^0.5);
   }
@@ -2098,7 +2098,7 @@ mixin template AdagradMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     G += (coef^^2);
     coef += (learningRate*grad)/((G + epsilon)^^0.5);
   }
@@ -2108,7 +2108,7 @@ mixin template AdagradMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     G += (coef^^2);
     coef += (learningRate*grad)/((G + epsilon)^^0.5);
   }
@@ -2157,7 +2157,7 @@ mixin template AdadeltaMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     auto momentumM1 = (1 - momentum);
     G = (momentum*G) + (momentumM1*(grad^^2));
     ColumnVector!(T) diff = (grad*((B + epsilon)^^0.5))/((G + epsilon)^^0.5);
@@ -2170,7 +2170,7 @@ mixin template AdadeltaMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     auto momentumM1 = (1 - momentum);
     G = (momentum*G) + (momentumM1*(grad^^2));
     ColumnVector!(T) diff = (grad*((B + epsilon)^^0.5))/((G + epsilon)^^0.5);
@@ -2183,7 +2183,7 @@ mixin template AdadeltaMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     auto momentumM1 = (1 - momentum);
     G = (momentum*G) + (momentumM1*(grad^^2));
     ColumnVector!(T) diff = (grad*((B + epsilon)^^0.5))/((G + epsilon)^^0.5);
@@ -2235,7 +2235,7 @@ mixin template RMSpropMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     G = (0.9*G) + (0.1*(grad^^2));
     ColumnVector!(T) diff = (learningRate*grad)/((G + epsilon)^^0.5);
     coef += diff;
@@ -2246,7 +2246,7 @@ mixin template RMSpropMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     G = (0.9*G) + (0.1*(grad^^2));
     ColumnVector!(T) diff = (learningRate*grad)/((G + epsilon)^^0.5);
     coef += diff;
@@ -2257,7 +2257,7 @@ mixin template RMSpropMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     G = (0.9*G) + (0.1*(grad^^2));
     ColumnVector!(T) diff = (learningRate*grad)/((G + epsilon)^^0.5);
     coef += diff;
@@ -2312,7 +2312,7 @@ mixin template AdamMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     m = (b1*m) + ((1 - b1)*grad);
     v = (b2*v) + ((1 - b2)*(grad^^2));
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
@@ -2326,7 +2326,7 @@ mixin template AdamMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     m = (b1*m) + ((1 - b1)*grad);
     v = (b2*v) + ((1 - b2)*(grad^^2));
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
@@ -2340,7 +2340,7 @@ mixin template AdamMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     m = (b1*m) + ((1 - b1)*grad);
     v = (b2*v) + ((1 - b2)*(grad^^2));
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
@@ -2402,7 +2402,7 @@ mixin template AdaMaxMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
 
     T absG = norm(grad);
     v = (b2*v) + ((1 - b2)*absG);
@@ -2419,7 +2419,7 @@ mixin template AdaMaxMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     
     T absG = norm(grad);
     v = (b2*v) + ((1 - b2)*absG);
@@ -2436,9 +2436,9 @@ mixin template AdaMaxMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     
-    //writeln("gradient: ", grad.getData, "\n");
+    //writeln("gradient: ", grad.array, "\n");
     T absG = norm(grad);
     //writeln("Norm: ", absG);
     v = (b2*v) + ((1 - b2)*absG);
@@ -2446,7 +2446,7 @@ mixin template AdaMaxMixin(T, CBLAS_LAYOUT layout)
     T u = max(b2*v, absG);
     m = (b1*m) + ((1 - b1)*grad);
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
-    //writeln("mp: ", mp.getData, "\n");
+    //writeln("mp: ", mp.array, "\n");
     ColumnVector!(T) diff = (learningRate * mp)/u;
 
     coef += diff;
@@ -2504,7 +2504,7 @@ mixin template NAdamMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
 
     m = (b1*m) + ((1 - b1)*grad);
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
@@ -2521,7 +2521,7 @@ mixin template NAdamMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     
     m = (b1*m) + ((1 - b1)*grad);
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
@@ -2538,7 +2538,7 @@ mixin template NAdamMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     
     m = (b1*m) + ((1 - b1)*grad);
     ColumnVector!(T) mp = m/(1 - (b1^^iter));
@@ -2612,7 +2612,7 @@ mixin template AMSGradMixin(T, CBLAS_LAYOUT layout)
             ColumnVector!T y, Matrix!(T, layout) x, ColumnVector!T mu,
             ColumnVector!T eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
 
     m = (b1*m) + ((1 - b1)*grad);
     v = (b2*v) + ((1 - b2)*(grad^^2));
@@ -2627,7 +2627,7 @@ mixin template AMSGradMixin(T, CBLAS_LAYOUT layout)
             BlockColumnVector!(T) mu, BlockColumnVector!(T) eta,
             ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(distrib, link, y, x, mu, eta);
+    auto grad = gradient(distrib, link, y, x, mu, eta);
     
     m = (b1*m) + ((1 - b1)*grad);
     v = (b2*v) + ((1 - b2)*(grad^^2));
@@ -2642,7 +2642,7 @@ mixin template AMSGradMixin(T, CBLAS_LAYOUT layout)
             BlockMatrix!(T, layout) x, BlockColumnVector!(T) mu,
             BlockColumnVector!(T) eta, ref ColumnVector!(T) coef)
   {
-    auto grad = pgradient(dataType, distrib, link, y, x, mu, eta);
+    auto grad = gradient(dataType, distrib, link, y, x, mu, eta);
     
     m = (b1*m) + ((1 - b1)*grad);
     v = (b2*v) + ((1 - b2)*(grad^^2));

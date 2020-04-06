@@ -168,6 +168,19 @@ auto zerosColumn(T)(ulong n)
 }
 */
 
+/*
+  Sum(x[i]*y[i])_{i = 0, n - 1}
+*/
+T dotSum(T)(Vector!(T) x, Vector!(T) y)
+{
+  assert(x.length == y.length, "Vectors are not of equal length");
+  T ret = 0; ulong n = x.length;
+  for(ulong i = 0; i < n; ++i)
+    ret += x[i]*y[i];
+  return ret;
+}
+
+
 auto onesColumn(T)(ulong n)
 {
   return fillColumn!(T)(cast(T)1, n);

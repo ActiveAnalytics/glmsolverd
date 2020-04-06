@@ -174,21 +174,21 @@ void gdDataDemo()
   /* Gradient Descent With Regular Data */
   gammaModel = glm!(double)(new RegularData(), gammaX, 
         gammaY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new GradientDescent!(double)(1E-4), new GETRIInverse!(double)(),
+        new GradientDescent!(double)(4E-5), new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Gradient Descent solver with regular data \n", gammaModel);
   /***************************************************************/
   /* Gradient Descent With Block Data */
   gammaModel = glm!(double)(new Block1D(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new GradientDescent!(double)(1E-4), new GETRIInverse!(double)(),
+        new GradientDescent!(double)(4E-5), new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Gradient Descent solver with block data \n", gammaModel);
   /***************************************************************/
   /* Gradient Descent Parallel Block Model */
   gammaModel = glm!(double)(new Block1DParallel(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new GradientDescent!(double)(1E-4), new GETRIInverse!(double)(),
+        new GradientDescent!(double)(4E-5), new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Gradient Descent solver with block parallel data \n", gammaModel);
 }
@@ -220,14 +220,14 @@ void gdMomentumDemo()
   /* Gradient Descent Block Model */
   gammaModel = glm!(double)(new Block1DParallel(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new GradientDescent!(double)(1E-4), new GETRIInverse!(double)(),
+        new GradientDescent!(double)(4E-5), new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Gradient Descent solver with parallel data \n", gammaModel);
   /***************************************************************/
   /* Gradient Descent Momentum Block Model */
   gammaModel = glm!(double)(new Block1DParallel(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Momentum!(double)(2E-5, 0.90, p),
+        new Momentum!(double)(1E-5, 0.90, p),
         new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Gradient Descent solver with parallel data for Momentum Solver \n", gammaModel);
@@ -252,23 +252,30 @@ void gdMomentumDataDemo()
   auto p = gammaX.ncol;
 
   writeln("The outputs for all these models should be the same.");
+  /***************************************************************/
+  /* Standard GLM Model Using Regular Data */
   auto gammaModel = glm!(double)(new RegularData(), gammaX, 
         gammaY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Momentum!(double)(2E-5, 0.9, p), new GETRIInverse!(double)(),
+        new GESVSolver!(double)(), new GETRIInverse!(double)());
+  writeln("Full GLM Solve\n", gammaModel);
+  /***************************************************************/
+  gammaModel = glm!(double)(new RegularData(), gammaX, 
+        gammaY, new GammaDistribution!(double)(), new LogLink!(double)(),
+        new Momentum!(double)(1E-5, 0.9, p), new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Momentum Gradient Descent With Regular Data\n", gammaModel);
   /***************************************************************/
   /* Gradient Descent Block Model */
   gammaModel = glm!(double)(new Block1DParallel(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Momentum!(double)(2E-5, 0.9, p), new GETRIInverse!(double)(),
+        new Momentum!(double)(1E-5, 0.9, p), new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Momentum Gradient Descent With Parallel Data \n", gammaModel);
 
   /* Gradient Descent Momentum Block Model */
   gammaModel = glm!(double)(new Block1DParallel(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Momentum!(double)(2E-5, 0.9, p),
+        new Momentum!(double)(1E-5, 0.9, p),
         new GETRIInverse!(double)(),
         new Control!(double)(30));
   writeln("Momentum Gradient Descent With Parallel Data \n", gammaModel);
@@ -298,7 +305,7 @@ void gdNesterovDataDemo()
   writeln("The outputs for all these models should be the same.");
   gammaModel = glm!(double)(new RegularData(), gammaX, 
         gammaY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Nesterov!(double)(1E-6, 0.3, p), new GETRIInverse!(double)(),
+        new Nesterov!(double)(3E-5, 0.3, p), new GETRIInverse!(double)(),
         new Control!(double)(30),
         true, false);
   writeln("Nesterov Gradient Descent With Regular Data\n", gammaModel);
@@ -306,7 +313,7 @@ void gdNesterovDataDemo()
   /* Gradient Descent Block Model */
   gammaModel = glm!(double)(new Block1D(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Nesterov!(double)(1E-6, 0.3, p), new GETRIInverse!(double)(),
+        new Nesterov!(double)(3E-5, 0.3, p), new GETRIInverse!(double)(),
         new Control!(double)(30),
         true, false);
   writeln("Nesterov Gradient Descent With Block Data \n", gammaModel);
@@ -314,7 +321,7 @@ void gdNesterovDataDemo()
   /* Gradient Descent Nesterov Block Model */
   gammaModel = glm!(double)(new Block1DParallel(), gammaBlockX, 
         gammaBlockY, new GammaDistribution!(double)(), new LogLink!(double)(),
-        new Nesterov!(double)(1E-6, 0.3, p),
+        new Nesterov!(double)(3E-5, 0.3, p),
         new GETRIInverse!(double)(),
         new Control!(double)(30), 
         totalCPUs, true, false);

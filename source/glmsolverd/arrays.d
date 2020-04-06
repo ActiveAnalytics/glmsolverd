@@ -115,296 +115,406 @@ string floatFormat(int[] mlen, int dp = 6, int dig = 7, int gap = 2)
 mixin template MatrixGubbings(T, CBLAS_LAYOUT L)
 {
   private:
-    T[] data;
-    ulong[] dim;
+  T[] data;
+  ulong[] dim;
+  
   public:
-    this(T)(T[] dat, ulong rows, ulong cols)
+  this(T)(T[] dat, ulong rows, ulong cols)
+  {
+    assert(rows*cols == dat.length, 
+          "dimension of matrix inconsistent with length of array");
+    data = dat; dim = [rows, cols];
+  }
+  this(ulong n, ulong m)
+  {
+    data = new T[n*m];
+    dim = [n, m];
+  }
+  this(T)(T[] dat, ulong[] d)
+  {
+    ulong tlen = d[0]*d[1];
+    assert(tlen == dat.length, 
+          "dimension of matrix inconsistent with length of array");
+    data = dat; dim = d;
+  }
+  this(T, CBLAS_LAYOUT L)(Matrix!(T, L) mat)
+  {
+    data = mat.data.dup;
+    dim = mat.dim.dup;
+  }
+  @property Matrix!(T, L) dup()
+  {
+    return new Matrix!(T, L)(data.dup, dim.dup);
+  }
+  T opIndex(ulong i, ulong j) const
+  {
+    return data[dim[0]*j + i];
+  }
+  void opIndexAssign(T x, ulong i, ulong j)
+  {
+    // Zero based indexing
+    // Need check for j < n_col & i < n_row
+    data[dim[0]*j + i] = x;
+  }
+  T opIndexOpAssign(string op)(T x, ulong i, ulong j)
+  {
+    static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
+      mixin("return data[dim[0]*j + i] " ~ op ~ "= x;");
+    else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
+  }
+  Matrix!(T, L) opBinary(string op)(Matrix!(T, L) x)
+  {
+    assert( data.length == x.array.length,
+          "Number of rows and columns in matrices not equal.");
+    ulong n = data.length;
+    Matrix!(T, L) ret = new Matrix!(T, L)(dim[0], dim[1]);
+    static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
     {
-      assert(rows*cols == dat.length, 
-            "dimension of matrix inconsistent with length of array");
-      data = dat; dim = [rows, cols];
-    }
-    this(ulong n, ulong m)
-    {
-      data = new T[n*m];
-      dim = [n, m];
-    }
-    this(T)(T[] dat, ulong[] d)
-    {
-      ulong tlen = d[0]*d[1];
-      assert(tlen == dat.length, 
-            "dimension of matrix inconsistent with length of array");
-      data = dat; dim = d;
-    }
-    this(T, CBLAS_LAYOUT L)(Matrix!(T, L) mat)
-    {
-      data = mat.data.dup;
-      dim = mat.dim.dup;
-    }
-    @property Matrix!(T, L) dup()
-    {
-      return new Matrix!(T, L)(data.dup, dim.dup);
-    }
-    T opIndex(ulong i, ulong j) const
-    {
-      return data[dim[0]*j + i];
-    }
-    void opIndexAssign(T x, ulong i, ulong j)
-    {
-      // Zero based indexing
-      // Need check for j < n_col & i < n_row
-      data[dim[0]*j + i] = x;
-    }
-    T opIndexOpAssign(string op)(T x, ulong i, ulong j)
-    {
-      static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
-        mixin("return data[dim[0]*j + i] " ~ op ~ "= x;");
-      else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
-    }
-    Matrix!(T, L) opBinary(string op)(Matrix!(T, L) x)
-    {
-      assert( data.length == x.getData.length,
-            "Number of rows and columns in matrices not equal.");
-      ulong n = data.length;
-      Matrix!(T, L) ret = new Matrix!(T, L)(dim[0], dim[1]);
-      static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
+      for(ulong i = 0; i < n; ++i)
       {
-        for(ulong i = 0; i < n; ++i)
-        {
-          mixin("ret.getData[i] = " ~ "data[i] " ~ op ~ " x.getData[i];");
-        }
-      }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
-      return ret;
-    }
-    Matrix!(T, L) opBinary(string op)(T rhs)
+        mixin("ret.array[i] = " ~ "data[i] " ~ op ~ " x.array[i];");
+      }
+    }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
+    return ret;
+  }
+  Matrix!(T, L) opBinary(string op)(T rhs)
+  {
+    ulong n = data.length;
+    Matrix!(T, L) ret = new Matrix!(T, L)(dim[0], dim[1]);
+    static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
     {
-      ulong n = data.length;
-      Matrix!(T, L) ret = new Matrix!(T, L)(dim[0], dim[1]);
-      static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
+      for(ulong i = 0; i < n; ++i)
       {
-        for(ulong i = 0; i < n; ++i)
-        {
-          mixin("ret.getData[i] = " ~ "data[i] " ~ op ~ " rhs;");
-        }
-      }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
-      return ret;
-    }
-    Matrix!(T, L) opBinaryRight(string op)(T lhs)
+        mixin("ret.array[i] = " ~ "data[i] " ~ op ~ " rhs;");
+      }
+    }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
+    return ret;
+  }
+  Matrix!(T, L) opBinaryRight(string op)(T lhs)
+  {
+    ulong n = data.length;
+    Matrix!(T, L) ret = new Matrix!(T, L)(dim[0], dim[1]);
+    static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
     {
-      ulong n = data.length;
-      Matrix!(T, L) ret = new Matrix!(T, L)(dim[0], dim[1]);
-      static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
+      for(ulong i = 0; i < n; ++i)
       {
-        for(ulong i = 0; i < n; ++i)
-        {
-          mixin("ret.getData[i] = " ~ "lhs " ~ op ~ " data[i];");
-        }
-      }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
-      return ret;
-    }
-    void opOpAssign(string op)(Matrix!(T, L) x)
+        mixin("ret.array[i] = " ~ "lhs " ~ op ~ " data[i];");
+      }
+    }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
+    return ret;
+  }
+  void opOpAssign(string op)(Matrix!(T, L) x)
+  {
+    assert( data.length == x.array.length,
+          "Number of rows and columns in matrices not equal.");
+    ulong n = data.length;
+    static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
     {
-      assert( data.length == x.getData.length,
-            "Number of rows and columns in matrices not equal.");
-      ulong n = data.length;
-      static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
+      for(ulong i = 0; i < n; ++i)
       {
-        for(ulong i = 0; i < n; ++i)
-        {
-          mixin("data[i] " ~ op ~ "= x.getData[i];");
-        }
-      }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
-    }
-    /* mat "op"= rhs */
-    void opOpAssign(string op)(T rhs)
+        mixin("data[i] " ~ op ~ "= x.array[i];");
+      }
+    }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
+  }
+  /* mat "op"= rhs */
+  void opOpAssign(string op)(T rhs)
+  {
+    ulong n = data.length;
+    static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
     {
-      ulong n = data.length;
-      static if((op == "+") | (op == "-") | (op == "*") | (op == "/") | (op == "^^"))
+      for(ulong i = 0; i < n; ++i)
       {
-        for(ulong i = 0; i < n; ++i)
+        mixin("data[i] " ~ op ~ "= rhs;");
+      }
+    }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
+  }
+  @property ulong nrow()
+  {
+    return dim[0];
+  }
+  @property ulong ncol()
+  {
+    return dim[1];
+  }
+  /* Retire this method */
+  @property T[] getData()
+  {
+    return data;
+  }
+  @property T[] array()
+  {
+    return data;
+  }
+  @property ulong len()
+  {
+    return data.length;
+  }
+  @property size() const
+  {
+    return dim.dup;
+  }
+  /* Returns transposed matrix (duplicated) */
+  Matrix!(T, L) t()
+  {
+    auto ddat = data.dup;
+    ulong[] ddim = new ulong[2];
+    ddim[0] = dim[1]; ddim[1] = dim[0];
+    if((dim[0] == 1) & (dim[1] == 1)){
+    } else if(dim[0] != dim[1]) {
+      for(int j = 0; j < dim[1]; ++j)
+      {
+        for(int i = 0; i < dim[0]; ++i)
         {
-          mixin("data[i] " ~ op ~ "= rhs;");
-        }
-      }else static assert(0, "Operator \"" ~ op ~ "\" not implemented");
-    }
-    @property ulong nrow()
-    {
-      return dim[0];
-    }
-    @property ulong ncol()
-    {
-      return dim[1];
-    }
-    @property T[] getData()
-    {
-      return data;
-    }
-    @property ulong len()
-    {
-      return data.length;
-    }
-    @property size() const
-    {
-      return dim.dup;
-    }
-    /* Returns transposed matrix (duplicated) */
-    Matrix!(T, L) t()
-    {
-      auto ddat = data.dup;
-      ulong[] ddim = new ulong[2];
-      ddim[0] = dim[1]; ddim[1] = dim[0];
-      if((dim[0] == 1) & (dim[1] == 1)){
-      } else if(dim[0] != dim[1]) {
-        for(int j = 0; j < dim[1]; ++j)
-        {
-          for(int i = 0; i < dim[0]; ++i)
-          {
-            ddat[ddim[0]*i + j] = data[dim[0]*j + i];
-          }
-        }
-      } else  if(dim[0] == dim[1]) {
-        for(int j = 0; j < dim[1]; ++j)
-        {
-          for(int i = 0; i < dim[0]; ++i)
-          {
-            if(i == j)
-              continue;
-            ddat[ddim[0]*i + j] = data[dim[0]*j + i];
-          }
+          ddat[ddim[0]*i + j] = data[dim[0]*j + i];
         }
       }
-      return new Matrix!(T, L)(ddat, ddim);
-    }
-    /* Cast to Column Vector */
-    ColumnVector!(T) opCast(V: ColumnVector!(T))() {
-      assert(ncol == 1, "The number of columns in the matrix 
-           is not == 1 and so can not be converted to a matrix.");
-      return new ColumnVector!(T)(data);
-    }
-    /* Cast to Row Vector */
-    RowVector!(T) opCast(V: RowVector!(T))() {
-      assert(ncol == 1, "The number of columns in the matrix
-           is not == 1 and so can not be converted to a matrix.");
-      return new RowVector!(T)(data);
-    }
-    /* Appends Vector to the END of the matrix */
-    void appendColumn(T[] rhs)
-    {
-      assert(rhs.length == nrow,
-        "Vector is not of the same length as number of rows.");
-      static if(L == CblasColMajor)
+    } else  if(dim[0] == dim[1]) {
+      for(int j = 0; j < dim[1]; ++j)
       {
-        data ~= rhs;
-        dim[1] += 1;
-      } else {
-        dim[1] += 1;
-        auto ni = dim[0]*dim[1];
-        T[] _data = new T[ni];
-        ulong i, j, k = 0;
-        while(i < ni)
+        for(int i = 0; i < dim[0]; ++i)
         {
-          auto imod = (i + 1) % nrow;
-          if(imod != 0)
-          {
-            _data[i] = data[k];
-            ++k;
-          }else{
-            _data[i] = rhs[j];
-            ++j;
-          }
-          ++i;
+          if(i == j)
+            continue;
+          ddat[ddim[0]*i + j] = data[dim[0]*j + i];
         }
-        data = _data;
       }
-      return;
     }
-    void appendColumn(Vector!(T) rhs)
+    return new Matrix!(T, L)(ddat, ddim);
+  }
+  /* Cast to Column Vector */
+  ColumnVector!(T) opCast(V: ColumnVector!(T))() {
+    assert(ncol == 1, "The number of columns in the matrix 
+         is not == 1 and so can not be converted to a matrix.");
+    return new ColumnVector!(T)(data);
+  }
+  /* Cast to Row Vector */
+  RowVector!(T) opCast(V: RowVector!(T))() {
+    assert(ncol == 1, "The number of columns in the matrix
+         is not == 1 and so can not be converted to a matrix.");
+    return new RowVector!(T)(data);
+  }
+  /* Appends Vector to the END of the matrix */
+  void appendColumn(T[] rhs)
+  {
+    assert(rhs.length == nrow,
+      "Vector is not of the same length as number of rows.");
+    static if(L == CblasColMajor)
     {
-      appendColumn(rhs.getData);
-      return;
-    }
-    void appendColumn(Matrix!(T) rhs)
-    {
-      assert((rhs.nrow == 1) | (rhs.ncol == 1), 
-        "Matrix does not have 1 row or 1 column");
-      appendColumn(rhs.getData);
-    }
-    void appendColumn(T _rhs)
-    {
-      auto rhs = new T[nrow];
-      rhs[] = _rhs;
-      appendColumn(rhs);
-    }
-    /* Prepends Column Vector to the START of the matrix */
-    void prependColumn(T[] rhs)
-    {
-      assert(rhs.length == nrow,
-        "Vector is not of the same length as  number of rows.");
-      static if(L == CblasColMajor)
+      data ~= rhs;
+      dim[1] += 1;
+    } else {
+      dim[1] += 1;
+      auto ni = dim[0]*dim[1];
+      T[] _data = new T[ni];
+      ulong i, j, k = 0;
+      while(i < ni)
       {
-        data = rhs ~ data;
-        dim[1] += 1;
-      } else {
-        dim[1] += 1;
-        auto ni = dim[0]*dim[1];
-        T[] _data = new T[ni];
-        ulong i, j, k = 0;
-        while(i < ni)
+        auto imod = (i + 1) % nrow;
+        if(imod != 0)
         {
-          auto imod = (i + 1) % nrow;
-          if(imod != 1)
-          {
-            _data[i] = data[k];
-            ++k;
-          }else{
-            _data[i] = rhs[j];
-            ++j;
-          }
-          ++i;
+          _data[i] = data[k];
+          ++k;
+        }else{
+          _data[i] = rhs[j];
+          ++j;
         }
-        data = _data;
+        ++i;
       }
-      return;
+      data = _data;
     }
-    void prependColumn(Vector!(T) rhs)
+    return;
+  }
+  void appendColumn(Vector!(T) rhs)
+  {
+    appendColumn(rhs.array);
+    return;
+  }
+  void appendColumn(Matrix!(T) rhs)
+  {
+    assert((rhs.nrow == 1) | (rhs.ncol == 1), 
+      "Matrix does not have 1 row or 1 column");
+    appendColumn(rhs.array);
+  }
+  void appendColumn(T _rhs)
+  {
+    auto rhs = new T[nrow];
+    rhs[] = _rhs;
+    appendColumn(rhs);
+  }
+  /* Prepends Column Vector to the START of the matrix */
+  void prependColumn(T[] rhs)
+  {
+    assert(rhs.length == nrow,
+      "Vector is not of the same length as  number of rows.");
+    static if(L == CblasColMajor)
     {
-      prependColumn(rhs.getData);
-      return;
-    }
-    void prependColumn(Matrix!(T) rhs)
-    {
-      assert((rhs.nrow == 1) | (rhs.ncol == 1), 
-        "Matrix does not have 1 row or 1 column");
-      prependColumn(rhs.getData);
-    }
-    void prependColumn(T _rhs)
-    {
-      auto rhs = new T[nrow];
-      rhs[] = _rhs;
-      prependColumn(rhs);
-    }
-    auto columnSelect(ulong start, ulong end)
-    {
-      assert(end > start, "Starting column is not less than end column");
-      ulong nCol = end - start;
-      auto arr = new T[nrow * nCol];
-      auto startIndex = start*nrow;
-      ulong iStart = 0;
-      static if(L == CblasColMajor)
+      data = rhs ~ data;
+      dim[1] += 1;
+    } else {
+      dim[1] += 1;
+      auto ni = dim[0]*dim[1];
+      T[] _data = new T[ni];
+      ulong i, j, k = 0;
+      while(i < ni)
       {
-        for(ulong i = 0; i < nCol; ++i)
+        auto imod = (i + 1) % nrow;
+        if(imod != 1)
         {
-          //ulong j = start + i;
-          //arr[i*nrow..((i + 1)*nrow)] = data[j*nrow..((j + 1)*nrow)];
-          arr[iStart..((iStart + nrow))] = data[startIndex..(startIndex + nrow)];
-          startIndex += nrow;
-          iStart += nrow;
+          _data[i] = data[k];
+          ++k;
+        }else{
+          _data[i] = rhs[j];
+          ++j;
         }
+        ++i;
+      }
+      data = _data;
+    }
+    return;
+  }
+  void prependColumn(Vector!(T) rhs)
+  {
+    prependColumn(rhs.array);
+    return;
+  }
+  void prependColumn(Matrix!(T) rhs)
+  {
+    assert((rhs.nrow == 1) | (rhs.ncol == 1), 
+      "Matrix does not have 1 row or 1 column");
+    prependColumn(rhs.array);
+  }
+  void prependColumn(T _rhs)
+  {
+    auto rhs = new T[nrow];
+    rhs[] = _rhs;
+    prependColumn(rhs);
+  }
+  /* Contiguous column select copies the column */
+  auto columnSelect(ulong start, ulong end)
+  {
+    assert(end > start, "Starting column is not less than end column");
+    ulong nCol = end - start;
+    auto arr = new T[nrow * nCol];
+    auto startIndex = start*nrow;
+    ulong iStart = 0;
+    static if(L == CblasColMajor)
+    {
+      for(ulong i = 0; i < nCol; ++i)
+      {
+        //ulong j = start + i;
+        //arr[i*nrow..((i + 1)*nrow)] = data[j*nrow..((j + 1)*nrow)];
+        arr[iStart..((iStart + nrow))] = data[startIndex..(startIndex + nrow)];
+        startIndex += nrow;
+        iStart += nrow;
+      }
+    }else{
+      assert(0, "CblasRowMajor not yet implemented.");
+    }
+    return new Matrix!(T, L)(arr, [nrow, nCol]);
+  }
+  auto columnSelect(ulong index)
+  {
+    assert(index < ncol, "Selected index is not less than number of columns.");
+    auto arr = new T[nrow];
+    auto startIndex = index*nrow;
+    static if(L == CblasColMajor)
+    {
+      arr[] = data[startIndex..(startIndex + nrow)];
+    }else{
+      assert(0, "CblasRowMajor not yet implemented.");
+    }
+    return new Matrix!(T, L)(arr, [nrow, 1]);
+  }
+  /*
+    Function to remove a column from the matrix.
+  */
+  Matrix!(T, L) refColumnRemove(ulong index)
+  {
+    static if(L == CblasColMajor)
+    {
+      /* Remove first column */
+      if(index == 0)
+      {
+        data = data[nrow..$];
+        dim[1] -= 1;
+        return this;
+      /* Remove last column */
+      }else if(index == (ncol - 1))
+      {
+        data = data[0..($ - nrow)];
+        dim[1]-= 1;
+        return this;
+      /* Remove any other column */
       }else{
-        assert(0, "CblasRowMajor not yet implemented.");
+        auto start = index*nrow;
+        T[] newdata = new T[data.length - nrow];
+        newdata[0..start] = data[0..start];
+        newdata[start..$] = data[(start + nrow)..$];
+        data = newdata;
+        dim[1] -= 1;
+        return this;
       }
-      return new Matrix!(T, L)(arr, [nrow, nCol]);
+    }else{
+      assert(0, "CblasRowMajor not yet implemented.");
     }
+  }
+  /* Assigns vector in-place to a specific column */
+  /* Refactor these two methods */
+  Matrix!(T, L) refColumnAssign(T[] col, ulong index)
+  {
+    assert(col.length == nrow, "Length of vector is not the same as number of rows");
+    static if(L == CblasColMajor)
+    {
+      /* Replace first column */
+      if(index == 0)
+      {
+        data[0..nrow] = col;
+        return this;
+      /* Replace last column */
+      }else if(index == (ncol - 1))
+      {
+        data[($ - nrow)..$] = col;
+        return this;
+      /* Replace any other column */
+      }else{
+        auto start = index*nrow;
+        T[] newdata = new T[data.length - nrow];
+        data[start..(start + nrow)] = col;
+        return this;
+      }
+    }else{
+      assert(0, "CblasRowMajor not yet implemented.");
+    }
+  }
+  Matrix!(T, L) refColumnAssign(Vector!(T) col, ulong index)
+  {
+    return refColumnAssign(col.array, index);
+  }
+  Matrix!(T, L) refColumnAssign(T col, ulong index)
+  {
+    static if(L == CblasColMajor)
+    {
+      /* Replace first column */
+      if(index == 0)
+      {
+        data[0..nrow] = col;
+        return this;
+      /* Replace last column */
+      }else if(index == (ncol - 1))
+      {
+        data[($ - nrow)..$] = col;
+        return this;
+      /* Replace any other column */
+      }else{
+        auto start = index*nrow;
+        T[] newdata = new T[data.length - nrow];
+        data[start..(start + nrow)] = col;
+        return this;
+      }
+    }else{
+      assert(0, "CblasRowMajor not yet implemented.");
+    }
+  }
 }
 /* Assuming column major */
 class Matrix(T, CBLAS_LAYOUT L = CblasColMajor)
@@ -520,6 +630,7 @@ interface Vector(T)
   void opIndexAssign(T x, ulong i);
   void opIndexOpAssign(string op)(T x, ulong i);
   @property T[] getData();
+  @property T[] array();
   Matrix!(T, layout) opCast(M: Matrix!(T, layout), CBLAS_LAYOUT layout)();
 }
 mixin template VectorGubbings(T)
@@ -556,6 +667,10 @@ mixin template VectorGubbings(T)
     else static assert(0, "Operator "~ op ~" not implemented");
   }
   @property T[] getData()
+  {
+    return data;
+  }
+  @property T[] array()
   {
     return data;
   }

@@ -4,7 +4,7 @@ import demos.scratch;
 void main()
 {
   /* From demos.d */
-  timed_demo();
+  //timed_demo();
   //parallelBlockGLMDemo();
   //gdDataDemo();
   //gdMomentumDemo();
@@ -21,4 +21,5 @@ void main()
   /* From scratch.d */
   //poissonRNG(10_000, 30);
   //appendDemo();
+  lbfgsTest();
 }

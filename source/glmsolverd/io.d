@@ -40,12 +40,33 @@ Matrix!(T, layout)[] matrixToBlock(T, CBLAS_LAYOUT layout = CblasColMajor)(Matri
   return ret;
 }
 
+ColumnVector!(T)[] vectorToBlock(T)(ColumnVector!(T) arr, ulong nBlocks)
+{
+  ulong n = arr.length;
+  auto ret = new ColumnVector!(T)[nBlocks];
+  for(ulong i = 0; i < nBlocks; ++i)
+  {
+    ulong start = (n*i)/nBlocks;
+    ulong finish = (n*(i + 1)/nBlocks);
+    ColumnVector!(T) temp = zerosColumn!(T)(finish - start);
+    ulong len = finish - start;
+    for(ulong j = start; j < finish; ++j)
+    {
+      ulong l = cast(ulong)mod(cast(real)j, cast(real)len);
+      temp[l] = arr[j];
+    }
+    ret[i] = temp;
+  }
+  return ret;
+}
+
+
 void writeColumnVector(T)(string fileName, ColumnVector!T v)
 {
   auto file = File(fileName, "wb");
   size_t[1] n = [v.len];
   file.rawWrite(n);
-  file.rawWrite(v.getData);
+  file.rawWrite(v.array);
   return;
 }
 void writeRowVector(T)(string fileName, RowVector!T v)
@@ -53,7 +74,7 @@ void writeRowVector(T)(string fileName, RowVector!T v)
   auto file = File(fileName, "wb");
   size_t[1] n = [v.len];
   file.rawWrite(n);
-  file.rawWrite(v.getData);
+  file.rawWrite(v.array);
   return;
 }
 ColumnVector!T readColumnVector(T)(string fileName)
@@ -79,7 +100,7 @@ void writeMatrix(T, CBLAS_LAYOUT layout = CblasColMajor)(string fileName, Matrix
   auto file = File(fileName, "wb");
   size_t[2] dim = [mat.nrow, mat.ncol];
   file.rawWrite(dim);
-  file.rawWrite(mat.getData);
+  file.rawWrite(mat.array);
   return;
 }
 Matrix!(T, layout) readMatrix(T, CBLAS_LAYOUT layout = CblasColMajor)(string fileName)

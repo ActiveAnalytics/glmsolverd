@@ -150,7 +150,7 @@ if(isFloatingPoint!T)
     distrib = _distrib;
     link = _link;
     phi = _phi;
-    coefficients = coeff.getData;
+    coefficients = coeff.array;
     standardError = new T[_cov.nrow];
     for(ulong i = 0; i < _cov.nrow; ++i)
       standardError[i] = _cov[i, i]^^0.5;

@@ -601,7 +601,7 @@ if(isFloatingPoint!T)
     }
 
     solver.solve(distrib, link, y, x, mu, eta, coef);
-    //writeln("Coefficients: ", coef.getData, "\n");
+    //writeln("Coefficients: ", coef.array, "\n");
     
     if(control.printCoef)
       writeln(coef);
@@ -624,7 +624,7 @@ if(isFloatingPoint!T)
     //if(/* iter % 100 == 0 & */ true)
     //{
     //  writeln("Iteration: ", iter);
-    //  writeln("Coefficients: ", coef.getData, "\n");
+    //  writeln("Coefficients: ", coef.array, "\n");
     //  writeln("Deviance: ", dev, "\n");
     //}
 
@@ -649,14 +649,14 @@ if(isFloatingPoint!T)
       frac *= 0.5;
       coef = map!( (T x1, T x2) => x1 + (x2 * frac) )(coefold, coefdiff);
       
-      //writeln("Step control coefficient: ", coef.getData, "\n");
+      //writeln("Step control coefficient: ", coef.array, "\n");
       
       if(control.printCoef)
         writeln(coef);
       
       eta = mult_(x, coef);
 
-      //writeln("First few values of eta: ", eta.getData[0..10]);
+      //writeln("First few values of eta: ", eta.array[0..10]);
 
       if(doOffset)
         eta += offset;
@@ -667,7 +667,7 @@ if(isFloatingPoint!T)
       else
         residuals = distrib.devianceResiduals(mu, y, weights);
       
-      //writeln("First part of the deviance residuals: ", residuals.getData[0..10]);
+      //writeln("First part of the deviance residuals: ", residuals.array[0..10]);
       
       dev = sum!T(residuals);
       //writeln("Calculated step control deviance: ", dev);
@@ -719,7 +719,7 @@ if(isFloatingPoint!T)
     if(doWeights)
       w = map!( (x1, x2) => x1*x2 )(w, weights);
     
-    //writeln("Coefficients: ", coef.getData);
+    //writeln("Coefficients: ", coef.array);
     
     solver.XWX(xwx, xw, x, z, w);
     
@@ -855,7 +855,7 @@ if(isFloatingPoint!T)
     //if(/* iter % 100 == 0 & */ true)
     //{
     //  writeln("Iteration: ", iter);
-    //  writeln("Coefficients: ", coef.getData, "\n");
+    //  writeln("Coefficients: ", coef.array, "\n");
     //  writeln("Deviance: ", dev, "\n");
     //}
 
@@ -880,7 +880,7 @@ if(isFloatingPoint!T)
       frac *= 0.5;
       coef = map!( (T x1, T x2) => x1 + (x2 * frac) )(coefold, coefdiff);
 
-      //writeln("Step control coefficient: ", coef.getData, "\n");
+      //writeln("Step control coefficient: ", coef.array, "\n");
 
       if(control.printCoef)
         writeln(coef);
@@ -888,7 +888,7 @@ if(isFloatingPoint!T)
       for(ulong i = 0; i < nBlocks; ++i)
         eta[i] = mult_(x[i], coef);
       
-      //writeln("First few values of eta: ", eta[0].getData[0..10]);
+      //writeln("First few values of eta: ", eta[0].array[0..10]);
       
       if(doOffset)
       {
@@ -902,7 +902,7 @@ if(isFloatingPoint!T)
       else
         residuals = distrib.devianceResiduals(mu, y, weights);
       
-      //writeln("First part of the deviance residuals: ", residuals[0].getData[0..10]);
+      //writeln("First part of the deviance residuals: ", residuals[0].array[0..10]);
 
       dev = 0;
       for(ulong i = 0; i < nBlocks; ++i)
@@ -1058,9 +1058,9 @@ if(isFloatingPoint!T)
     if(solver.name == "Nesterov")
     {
       //writeln("Nesterov Modifier");
-      //writeln("Original Coefficient: ", coef.getData, "\n");
+      //writeln("Original Coefficient: ", coef.array, "\n");
       solver.NesterovModifier(coef);
-      //writeln("Modified Coefficient: ", coef.getData, "\n");
+      //writeln("Modified Coefficient: ", coef.array, "\n");
       foreach(i; taskPool.parallel(iota(nBlocks)))
         eta[i] = mult_(x[i], coef);
     
@@ -1071,11 +1071,11 @@ if(isFloatingPoint!T)
       }
       mu = link.linkinv(dataType, eta);
       solver.NesterovUnModifier(coef);
-      //writeln("UnModified Coefficient: ", coef.getData, "\n");
+      //writeln("UnModified Coefficient: ", coef.array, "\n");
     }
     solver.solve(dataType, distrib, link, y, x, mu, eta, coef);
     //writeln("Iteration: ", iter);
-    //writeln("Coefficient: ", coef.getData, "\n");
+    //writeln("Coefficient: ", coef.array, "\n");
     //writeln("Deviance: ", dev);
     
     if(control.printCoef)
@@ -1107,7 +1107,7 @@ if(isFloatingPoint!T)
     //if(/* iter % 100 == 0 & */ true)
     //{
     //  writeln("Iteration: ", iter);
-    //  writeln("Coefficients: ", coef.getData, "\n");
+    //  writeln("Coefficients: ", coef.array, "\n");
     //  writeln("Deviance: ", dev, "\n");
     //}
 
@@ -1132,7 +1132,7 @@ if(isFloatingPoint!T)
       frac *= 0.5;
       coef = map!( (T x1, T x2) => x1 + (x2 * frac) )(coefold, coefdiff);
       
-      //writeln("Step control coefficient: ", coef.getData, "\n");
+      //writeln("Step control coefficient: ", coef.array, "\n");
       
       if(control.printCoef)
         writeln(coef);
@@ -1140,7 +1140,7 @@ if(isFloatingPoint!T)
       foreach(i; taskPool.parallel(iota(nBlocks)))
         eta[i] = mult_(x[i], coef);
       
-      //writeln("First few values of eta: ", eta[0].getData[0..10]);
+      //writeln("First few values of eta: ", eta[0].array[0..10]);
       
       if(doOffset)
       {
@@ -1154,7 +1154,7 @@ if(isFloatingPoint!T)
       else
         residuals = distrib.devianceResiduals(dataType, mu, y, weights);
       
-      //writeln("First part of the deviance residuals: ", residuals[0].getData[0..10]);
+      //writeln("First part of the deviance residuals: ", residuals[0].array[0..10]);
       
       dev = 0;
       devStore = taskPool.workerLocalStorage(cast(T)0);
@@ -1175,7 +1175,7 @@ if(isFloatingPoint!T)
     devold = dev;
     coefold = coef.dup;
 
-    //writeln("Coefficient: ", coef.getData);
+    //writeln("Coefficient: ", coef.array);
 
     if(control.printError)
     {
