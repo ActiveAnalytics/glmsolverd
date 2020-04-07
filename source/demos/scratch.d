@@ -88,7 +88,7 @@ void appendDemo()
 }
 
 
-void lbfgsTest()
+void lbfgsComponentTest()
 {
   /* Simulate the data */
   auto seed = 4;
@@ -180,19 +180,31 @@ void lbfgsTest()
                     coef, gammaBlockY, gammaBlockX, nullBlock, 
                     nullBlock);
   writeln("Linear search output from block data, alpha: ", alphaLS);
-
-  /* Basic usage testing for LBFGS Solver */
-  auto lbfgs = new LBFGSSolver!(double)(gammaX.ncol, 5);
-  writeln("Formed lbfgs Solver");
-  ls = new BackTrackingLineSearch!(double)();
-  auto newCoefs = lbfgs.solve(new RegularData(), ls, distrib, link, 
-                             coef, gammaY, gammaX, nullVector, 
-                             nullVector);
-  writeln("Old coefficients: ", coef.array);
-  writeln("New coefficients: ", newCoefs.array);
-  writeln("S: ", lbfgs.sm);
-  writeln("Y: ", lbfgs.ym);
 }
 
 
+void lbfgsTest()
+{
+  /* Simulate the data */
+  auto seed = 4;
+  AbstractDistribution!(double) distrib = new GammaDistribution!(double)();
+  AbstractLink!(double) link = new LogLink!(double)();
+  //auto gammaData = simulateData!(double)(distrib, link, 10_000, 30, seed);
+  auto gammaData = simulateData!(double)(distrib, link, 1000, 10, seed);
+  auto gammaX = gammaData.X;
+  auto gammaY = gammaData.y;
+  auto gammaBlockX = matrixToBlock(gammaX, 10);
+  auto gammaBlockY = matrixToBlock(gammaY, 10);
+  auto nullVector = zerosColumn!(double)(0);
+  auto nullBlock = new ColumnVector!(double)[0];
+  
+  auto lbfgs = new LBFGSSolver!(double)(gammaX.ncol, 5);
+  auto ls = new BackTrackingLineSearch!(double)();
+  auto regOutput = glm!(double)(new RegularData(), gammaX, 
+       cast(Matrix!(double, CblasColMajor))gammaY, distrib, link, 
+       lbfgs, ls, new Control!(double)(), true,  nullVector, nullVector);
+  auto glmModel = glm!(double)(new RegularData(), gammaX, gammaY, 
+        distrib, link, new GESVSolver!(double)(), new GETRIInverse!(double)());
+  writeln("\nGLMModel comparison: ", glmModel);
+}
 

@@ -91,11 +91,16 @@ can be tried out. Link Functions:
   - [ ] xiii. Step control exceeding should not result in failure but exiting
   with non convergence and a printed message.
   - [ ] xiv. Code refactoring.
+    - [ ] (a) Repeatative code needs to be removed using template functions.
+    - [ ] (b) Vectorise expressions over vectors or matrices as required,
+              maybe introduce Julia style expressions `@.` as a property or just use map - which will need to be modified for variadic vector/matrix inputs.
+    - [ ] (c) Tidy up libraraies, arrays needs to be split into classes,
+              convenience functions, and push the random stuff into sample.d. Need to split up linear algebra into matrix operations and solvers, get rid of old solvers and function that are no longer used like VanillaSolver and so forth.
 - [ ] 3. Implement memory and disk blocked matrix structure in and
          integrate them with your current algorithm. Creating a generic interface that could contend with any data structure with the right methods returning the right types to the function(s).
 - [ ] 4. Implement or adapt the current GLM algorithm to work with the memory and disk based blocked matrix data structures - Done for memory.
 - [ ] 5. Implement blocked data frame storage on disk and in memory.
-- [ ] 6. Compare your algorithm's performance with other implementations R, Python, Julia, H20, Scala Spark.
+- [ ] 6. Performance benchmark, how does solver time vary with data volume? Compare it with other implementations R Python, Julia, H20, Scala Spark.
 - [ ] 7. Write and finalise the documentation.
 
 Version 0.2 Post-Processing & Model Search Implementation
