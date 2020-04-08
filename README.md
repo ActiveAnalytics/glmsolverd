@@ -99,6 +99,12 @@ can be tried out. Link Functions:
     - [ ] (d) Iron out function parameter input order e.g. weights and offsets
               must be in the same order in a function and its sub-functions
     - [ ] (e) Simple but replace `ulong` with `long`.
+    - [ ] (f) Split gradient descent glm from regular glm in `fit.d` into
+              separte files collectively with their unique dependencies from
+              the `linearalgebra.d` file as done with `lbfgs.d`.
+    - [ ] (g) Consitent parameterisation of `dataType` in all functions and
+              sub-functions.
+    - [ ] (h) Convergence should be an `enum` rather than `bool`.
 - [ ] 3. Implement memory and disk blocked matrix structure in and
          integrate them with your current algorithm. Creating a generic interface that could contend with any data structure with the right methods returning the right types to the function(s).
 - [ ] 4. Implement or adapt the current GLM algorithm to work with the memory and disk based blocked matrix data structures - Done for memory.

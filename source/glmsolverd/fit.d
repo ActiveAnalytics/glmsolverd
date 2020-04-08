@@ -211,7 +211,7 @@ if(isFloatingPoint!T)
   {
     if(control.printError)
       writeln("Iteration: ", iter);
-    auto z = Z!(double)(link, y, mu, eta);
+    auto z = Z!(T)(link, y, mu, eta);
     if(doOffset)
     {
       for(ulong i = 0; i < nBlocks; ++i)
@@ -227,6 +227,12 @@ if(isFloatingPoint!T)
         w[i] = map!( (x1, x2) => x1*x2 )(w[i], weights[i]);
     }
 
+    /*
+      You need to do something about this method. You pass xw
+      which is in effect a Matrix!(T) - not used in the method
+      but you need to be internally consistent and make is a
+      Matrix!(T)[];
+    */
     solver.solve(R, xwx, xw, x, z, w, coef);
     
     if(control.printCoef)
@@ -395,7 +401,7 @@ if(isFloatingPoint!T)
   {
     if(control.printError)
       writeln("Iteration: ", iter);
-    auto z = Z!(double)(dataType, link, y, mu, eta);
+    auto z = Z!(T)(dataType, link, y, mu, eta);
     if(doOffset)
     {
       foreach(i; taskPool.parallel(iota(nBlocks)))
@@ -941,7 +947,7 @@ if(isFloatingPoint!T)
   T phi = 1;
   if(calculateCovariance)
   {
-    auto z = Z!(double)(link, y, mu, eta);
+    auto z = Z!(T)(link, y, mu, eta);
     if(doOffset)
     {
       for(ulong i = 0; i < nBlocks; ++i)
@@ -1198,7 +1204,7 @@ if(isFloatingPoint!T)
   
   T phi = 1;
   if(calculateCovariance){
-    auto z = Z!(double)(dataType, link, y, mu, eta);
+    auto z = Z!(T)(dataType, link, y, mu, eta);
     if(doOffset)
     {
       foreach(i; taskPool.parallel(iota(nBlocks)))

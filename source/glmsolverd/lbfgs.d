@@ -40,8 +40,9 @@ if(isFloatingPoint!T)
   {
     ulong n = mu.length;
     BlockColumnVector!(T) ret = new ColumnVector!(T)[n];
+    auto regData = new RegularData();
     for(ulong i = 0; i < n; ++i)
-      ret[i] = W(new RegularData(), distrib, link, mu[i], eta[i]);
+      ret[i] = W(regData, distrib, link, mu[i], eta[i]);
     return ret;
   }
   BlockColumnVector!(T) W(Block1DParallel dataType, 
@@ -49,9 +50,10 @@ if(isFloatingPoint!T)
               BlockColumnVector!(T) mu, BlockColumnVector!(T) eta)
   {
     ulong nBlocks = mu.length;
+    auto regData = new RegularData();
     BlockColumnVector!(T) ret = new ColumnVector!(T)[nBlocks];
     foreach(i; taskPool.parallel(iota(nBlocks)))
-      ret[i] = W(new RegularData(), distrib, link, mu[i], eta[i]);
+      ret[i] = W(regData, distrib, link, mu[i], eta[i]);
     return ret;
   }
 }
@@ -672,7 +674,7 @@ if(isFloatingPoint!T)
 class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
 {
   public:
-  ulong m; /* Number of recent {sk, yk} pairs to keep */
+  immutable(ulong) m; /* Number of recent {sk, yk} pairs to keep */
   ulong idx; /* Number of valid vectors so far */
   ulong iter; /* Iteration */
   immutable(T) epsilon;
@@ -936,6 +938,9 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
   }
 }
 
+/**
+  GLM function using LBFGS with Regular Data
+*/
 auto glm(T, CBLAS_LAYOUT layout = CblasColMajor)(
        RegularData dataType, Matrix!(T, layout) x, 
        Matrix!(T, layout) _y, AbstractDistribution!(T) distrib,
@@ -1033,7 +1038,7 @@ if(isFloatingPoint!(T))
   {
     //writeln("Relative error: ", relErr);
     //writeln("Gradient norm: ", gradErr);
-    if((relErr < control.epsilon) & (gradErr < solver.epsilon))
+    if((relErr < control.epsilon) & /* (gradErr < solver.epsilon) & */ (solver.iter >= solver.m))
       break;
     
     if(solver.calcAlpha0)
@@ -1108,3 +1113,357 @@ if(isFloatingPoint!(T))
 }
 
 
+/**
+  GLM function using LBFGS with Block1D Data
+*/
+auto glm(T, CBLAS_LAYOUT layout = CblasColMajor)(
+       Block1D dataType, Matrix!(T, layout)[] x, 
+       Matrix!(T, layout)[] _y, AbstractDistribution!(T) distrib,
+       AbstractLink!(T) link, LBFGSSolver!(T, layout) solver,
+       AbstractLineSearch!(T, layout) linesearch,
+       AbstractInverse!(T, layout) inverse = new GETRIInverse!(T, layout)(),
+       Control!T control = new Control!T(),
+       bool calculateCovariance = true, 
+       ColumnVector!(T)[] offset = new ColumnVector!(T)[0],
+       ColumnVector!(T)[] weights = new ColumnVector!(T)[0])
+if(isFloatingPoint!(T))
+{
+  auto init = distrib.init(new GradientDescent!(T, layout)(1), _y, weights);
+  auto y = init[0]; weights = init[1];
+  auto nBlocks = y.length;
+
+  long p = x[0].ncol;
+  long n = 0;
+  for(long i = 0; i < nBlocks; ++i)
+    n += x[i].nrow;
+  
+  // Initialize with link function
+  //solver.coef[0] = mean(link.linkfun(y).array);
+  //writeln("Initial coefficients: ", solver.coef.array);
+  
+  bool converged, badBreak, doOffset, doWeights;
+  converged = true;
+  
+  if(offset.length != 0)
+    doOffset = true;
+  if(weights.length != 0)
+    doWeights = true;
+  
+  auto gradient = new Gradient!(double)();
+  auto grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+  auto gradold = grad.dup;
+  
+  auto deviance = new Deviance!(T, layout)();
+  auto dev = deviance.deviance(dataType, distrib, link, 
+                  solver.coef, y, x, weights, offset);
+  auto devold = dev;
+  
+  /* Gradient descent with line search for first iteration */
+  auto alphaInit = linesearch.linesearch(dataType, distrib, 
+                    link, grad, solver.coef, y, x, weights, 
+                    offset);
+  
+  solver.coefold = solver.coef.dup;
+  auto dir = alphaInit*grad;
+  solver.coef += dir;
+  
+  dev = deviance.deviance(dataType, distrib, link, 
+                  solver.coef, y, x, weights, offset);
+  grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+  
+  auto sk = solver.coef - solver.coefold;
+  auto yk = grad - gradold;
+  
+  solver.sm.refColumnAssign(sk, 0);
+  solver.ym.refColumnAssign(yk, 0);
+  solver.rho[0] = 1/dotSum!(T)(yk, sk);
+  
+  T alpha0;
+  if(solver.calcAlpha0)
+  {
+    alpha0 = 2*(dev - devold)/dotSum!(T)(grad, dir);
+    alpha0 = alpha0 > 0 ? alpha0 : 1; /* Sanity check */
+    alpha0 = min(1, alpha0*1.01);
+    
+  }else{
+    alpha0 = 1;
+  }
+  
+  linesearch.setAlpha0(alpha0);
+  solver.solve(dataType, linesearch, distrib, link, 
+            y, x, weights, offset);
+  
+  auto absErr = T.infinity;
+  auto relErr = T.infinity;
+  auto gradErr = T.infinity;
+  
+  devold = dev;
+  dev = deviance.deviance(dataType, distrib, link, 
+                  solver.coef, y, x, weights, offset);
+
+  gradold = grad.dup;
+  grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+
+  absErr = absoluteError(dev, devold);
+  relErr = relativeError(dev, devold);
+  gradErr = norm(grad);
+  
+  while(true)
+  {
+    if((relErr < control.epsilon) & /* (gradErr < solver.epsilon) & */ (solver.iter >= solver.m))
+      break;
+    
+    if(solver.calcAlpha0)
+    {
+      alpha0 = 2*(dev - devold)/dotSum!(T)(grad, solver.pk);
+      alpha0 = alpha0 > 0 ? alpha0 : 1; /* Sanity check */
+      alpha0 = min(1, alpha0*1.01);
+    }else{
+      alpha0 = 1;
+    }
+        
+    linesearch.setAlpha0(alpha0);
+    solver.solve(dataType, linesearch, distrib, link, 
+              y, x, weights, offset);
+    
+    devold = dev;
+    dev = deviance.deviance(dataType, distrib, link, 
+                    solver.coef, y, x, weights, offset);
+    
+    gradold = grad.dup;
+    grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+    
+    absErr = absoluteError(dev, devold);
+    relErr = relativeError(dev, devold);
+    gradErr = norm(grad);
+    
+    if(control.maxit < solver.iter)
+    {
+      converged = false;
+      break;
+    }
+  }
+
+  T phi = 1;
+  Matrix!(T, layout) cov, xwx, R;
+  Matrix!(T, layout)[] xw;
+  if(calculateCovariance)
+  {
+    auto mu = gradient.muBlock;
+    auto eta = gradient.etaBlock;
+    auto z = Z!(T)(link, y, mu, eta);
+    if(doOffset)
+    {
+      for(ulong i = 0; i < nBlocks; ++i)
+        z[i] = map!( (x1, x2) => x1 - x2 )(z[i], offset[i]);
+    }
+    
+    auto W = new Weights!(T, layout)();
+    auto w = W.W(dataType, distrib, link, mu, eta);
+    
+    if(doWeights)
+    {
+      for(ulong i = 0; i < nBlocks; ++i)
+        w[i] = map!( (x1, x2) => x1*x2 )(w[i], weights[i]);
+    }
+    
+    auto XWX = new XWX!(T, layout)();
+    XWX.XWX(dataType, xwx, xw, x, z, w);
+    
+    cov = inverse.inv(xwx);
+    
+    if(!unitDispsersion!(T, typeof(distrib)))
+    {
+      phi = dev/(n - p);
+      imap!( (T x) => x*phi)(cov);
+    }
+  }else{
+    cov = fillMatrix!(T)(1, p, p);
+  }
+  auto obj = new GLM!(T, layout)(solver.iter, converged, phi, distrib, link, solver.coef, cov, dev, absErr, relErr);
+  return obj;
+}
+
+
+/**
+  GLM function using LBFGS with Block1D Data
+*/
+auto glm(T, CBLAS_LAYOUT layout = CblasColMajor)(
+       Block1DParallel dataType, Matrix!(T, layout)[] x, 
+       Matrix!(T, layout)[] _y, AbstractDistribution!(T) distrib,
+       AbstractLink!(T) link, LBFGSSolver!(T, layout) solver,
+       AbstractLineSearch!(T, layout) linesearch,
+       AbstractInverse!(T, layout) inverse = new GETRIInverse!(T, layout)(),
+       Control!T control = new Control!T(),
+       bool calculateCovariance = true, 
+       ColumnVector!(T)[] offset = new ColumnVector!(T)[0],
+       ColumnVector!(T)[] weights = new ColumnVector!(T)[0])
+if(isFloatingPoint!(T))
+{
+  auto init = distrib.init(new GradientDescent!(T, layout)(1), _y, weights);
+  auto y = init[0]; weights = init[1];
+  auto nBlocks = y.length;
+
+  long p = x[0].ncol;
+  long n = 0;
+  auto nStore = taskPool.workerLocalStorage(0L);
+  /* Parallelised reduction required */
+  foreach(i; taskPool.parallel(iota(nBlocks)))
+    nStore.get += x[i].nrow;
+  foreach (_n; nStore.toRange)
+        n += _n;
+  
+  // Initialize with link function
+  //solver.coef[0] = mean(link.linkfun(y).array);
+  //writeln("Initial coefficients: ", solver.coef.array);
+  
+  bool converged, badBreak, doOffset, doWeights;
+  converged = true;
+  
+  if(offset.length != 0)
+    doOffset = true;
+  if(weights.length != 0)
+    doWeights = true;
+  
+  auto gradient = new Gradient!(double)();
+  auto grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+  auto gradold = grad.dup;
+  
+  auto deviance = new Deviance!(T, layout)();
+  auto dev = deviance.deviance(dataType, distrib, link, 
+                  solver.coef, y, x, weights, offset);
+  auto devold = dev;
+  
+  /* Gradient descent with line search for first iteration */
+  auto alphaInit = linesearch.linesearch(dataType, distrib, 
+                    link, grad, solver.coef, y, x, weights, 
+                    offset);
+  
+  solver.coefold = solver.coef.dup;
+  auto dir = alphaInit*grad;
+  solver.coef += dir;
+  
+  dev = deviance.deviance(dataType, distrib, link, 
+                  solver.coef, y, x, weights, offset);
+  grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+  
+  auto sk = solver.coef - solver.coefold;
+  auto yk = grad - gradold;
+  
+  solver.sm.refColumnAssign(sk, 0);
+  solver.ym.refColumnAssign(yk, 0);
+  solver.rho[0] = 1/dotSum!(T)(yk, sk);
+  
+  T alpha0;
+  if(solver.calcAlpha0)
+  {
+    alpha0 = 2*(dev - devold)/dotSum!(T)(grad, dir);
+    alpha0 = alpha0 > 0 ? alpha0 : 1; /* Sanity check */
+    alpha0 = min(1, alpha0*1.01);
+    
+  }else{
+    alpha0 = 1;
+  }
+  
+  linesearch.setAlpha0(alpha0);
+  solver.solve(dataType, linesearch, distrib, link, 
+            y, x, weights, offset);
+  
+  auto absErr = T.infinity;
+  auto relErr = T.infinity;
+  auto gradErr = T.infinity;
+  
+  devold = dev;
+  dev = deviance.deviance(dataType, distrib, link, 
+                  solver.coef, y, x, weights, offset);
+
+  gradold = grad.dup;
+  grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+
+  absErr = absoluteError(dev, devold);
+  relErr = relativeError(dev, devold);
+  gradErr = norm(grad);
+  
+  while(true)
+  {
+    if((relErr < control.epsilon) & /* (gradErr < solver.epsilon) & */ (solver.iter >= solver.m))
+      break;
+    
+    if(solver.calcAlpha0)
+    {
+      alpha0 = 2*(dev - devold)/dotSum!(T)(grad, solver.pk);
+      alpha0 = alpha0 > 0 ? alpha0 : 1; /* Sanity check */
+      alpha0 = min(1, alpha0*1.01);
+    }else{
+      alpha0 = 1;
+    }
+        
+    linesearch.setAlpha0(alpha0);
+    solver.solve(dataType, linesearch, distrib, link, 
+              y, x, weights, offset);
+    
+    devold = dev;
+    dev = deviance.deviance(dataType, distrib, link, 
+                    solver.coef, y, x, weights, offset);
+    
+    gradold = grad.dup;
+    grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+    
+    absErr = absoluteError(dev, devold);
+    relErr = relativeError(dev, devold);
+    gradErr = norm(grad);
+    
+    if(control.maxit < solver.iter)
+    {
+      converged = false;
+      break;
+    }
+  }
+
+  T phi = 1;
+  Matrix!(T, layout) cov, xwx, R;
+  Matrix!(T, layout)[] xw;
+  if(calculateCovariance)
+  {
+    auto mu = gradient.muBlock;
+    auto eta = gradient.etaBlock;
+    auto z = Z!(T)(link, y, mu, eta);
+    if(doOffset)
+    {
+      foreach(i; taskPool.parallel(iota(nBlocks)))
+          z[i] = map!( (x1, x2) => x1 - x2 )(z[i], offset[i]);
+    }
+    
+    auto W = new Weights!(T, layout)();
+    auto w = W.W(dataType, distrib, link, mu, eta);
+    
+    if(doWeights)
+    {
+      foreach(i; taskPool.parallel(iota(nBlocks)))
+        w[i] = map!( (x1, x2) => x1*x2 )(w[i], weights[i]);
+    }
+    
+    auto XWX = new XWX!(T, layout)();
+    XWX.XWX(dataType, xwx, xw, x, z, w);
+    
+    cov = inverse.inv(xwx);
+    
+    if(!unitDispsersion!(T, typeof(distrib)))
+    {
+      phi = dev/(n - p);
+      imap!( (T x) => x*phi)(cov);
+    }
+  }else{
+    cov = fillMatrix!(T)(1, p, p);
+  }
+  auto obj = new GLM!(T, layout)(solver.iter, converged, phi, distrib, link, solver.coef, cov, dev, absErr, relErr);
+  return obj;
+}

@@ -197,15 +197,30 @@ void lbfgsTest()
   auto gammaBlockY = matrixToBlock(gammaY, 10);
   auto nullVector = zerosColumn!(double)(0);
   auto nullBlock = new ColumnVector!(double)[0];
-  
-  auto lbfgs = new LBFGSSolver!(double)(gammaX.ncol, 5);
+  auto p = gammaX.ncol;
+
+  auto lbfgs = new LBFGSSolver!(double)(p, 5);
   auto ls = new BackTrackingLineSearch!(double)();
-  auto glmModel = glm!(double)(new RegularData(), gammaX, 
-       gammaY, distrib, link, lbfgs, ls, new GETRIInverse!(double)(), 
-       new Control!(double)(), true,  nullVector, nullVector);
-  writeln("\nLBFGS GLMModel using regular data: ", glmModel);
-  glmModel = glm!(double)(new RegularData(), gammaX, gammaY, 
-        distrib, link, new GESVSolver!(double)(), new GETRIInverse!(double)());
+  auto inverse = new GETRIInverse!(double, CblasColMajor)();
+
+  auto glmModel = glm(new RegularData(), gammaX, gammaY, distrib,
+        link, new GESVSolver!(double)(), inverse);
   writeln("\nStandard GLMModel using regular data: ", glmModel);
+
+  glmModel = glm(new RegularData(), gammaX, 
+       gammaY, distrib, link, lbfgs, ls, inverse);
+  writeln("\nLBFGS GLMModel using regular data: ", glmModel);
+
+  lbfgs = new LBFGSSolver!(double)(p, 5);
+  ls = new BackTrackingLineSearch!(double)();
+  glmModel = glm(new Block1D(), gammaBlockX, 
+       gammaBlockY, distrib, link, lbfgs, ls, inverse);
+  writeln("\nLBFGS GLMModel with serial block1D data: ", glmModel);
+
+  lbfgs = new LBFGSSolver!(double)(p, 5);
+  ls = new BackTrackingLineSearch!(double)();
+  glmModel = glm(new Block1DParallel(), gammaBlockX, 
+       gammaBlockY, distrib, link, lbfgs, ls, inverse);
+  writeln("\nLBFGS GLMModel with parallel block1D data: ", glmModel);
 }
 
