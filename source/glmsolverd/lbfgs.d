@@ -41,7 +41,7 @@ if(isFloatingPoint!T)
     ulong n = mu.length;
     BlockColumnVector!(T) ret = new ColumnVector!(T)[n];
     for(ulong i = 0; i < n; ++i)
-      ret[i] = W(distrib, link, mu[i], eta[i]);
+      ret[i] = W(new RegularData(), distrib, link, mu[i], eta[i]);
     return ret;
   }
   BlockColumnVector!(T) W(Block1DParallel dataType, 
@@ -51,7 +51,7 @@ if(isFloatingPoint!T)
     ulong nBlocks = mu.length;
     BlockColumnVector!(T) ret = new ColumnVector!(T)[nBlocks];
     foreach(i; taskPool.parallel(iota(nBlocks)))
-      ret[i] = W(distrib, link, mu[i], eta[i]);
+      ret[i] = W(new RegularData(), distrib, link, mu[i], eta[i]);
     return ret;
   }
 }
@@ -61,14 +61,14 @@ class XWX(T, CBLAS_LAYOUT layout = CblasColMajor)
 if(isFloatingPoint!T)
 {
   public:
-  void XWX(ref Matrix!(T, layout) xwx, 
+  void XWX(RegularData dataType, ref Matrix!(T, layout) xwx, 
               ref Matrix!(T, layout) xw, ref Matrix!(T, layout) x,
               ref ColumnVector!(T) z, ref ColumnVector!(T) w)
   {
     xw = sweep!( (x1, x2) => x1 * x2 )(x, w);
     xwx = mult_!(T, layout, CblasTrans, CblasNoTrans)(xw, x);
   }
-  void XWX(ref Matrix!(T, layout) xwx, 
+  void XWX(Block1D dataType, ref Matrix!(T, layout) xwx, 
               ref BlockMatrix!(T, layout) xw, ref BlockMatrix!(T, layout) x,
               ref BlockColumnVector!(T) z, ref BlockColumnVector!(T) w)
   {
@@ -391,6 +391,10 @@ if(isFloatingPoint!T)
   }
 
   public:
+  ColumnVector!(T) etaRegular;
+  ColumnVector!(T) muRegular;
+  ColumnVector!(T)[] etaBlock;
+  ColumnVector!(T)[] muBlock;
   ColumnVector!(T) gradient(RegularData dataType, AbstractDistribution!T distrib, 
               AbstractLink!T link, /* ColumnVector!T dir, T alpha, */
               ColumnVector!(T) coef, ColumnVector!T y, 
@@ -402,7 +406,9 @@ if(isFloatingPoint!T)
     if(offset.length != 0)
       eta += offset;
     
+    etaRegular = eta;
     auto mu = link.linkinv(eta);
+    muRegular = mu;
 
     ulong p = x.ncol; ulong n = x.nrow;
     auto tmpGrad = gradient_(distrib, link, y, x, mu, eta);
@@ -429,7 +435,9 @@ if(isFloatingPoint!T)
       for(ulong i = 0; i < nBlocks; ++i)
         eta[i] += offset[i];
     }
+    etaBlock = eta;
     auto mu = link.linkinv(eta);
+    muBlock = mu;
 
     ulong p = x[0].ncol;
     auto grad = zerosColumn!T(p);
@@ -465,7 +473,9 @@ if(isFloatingPoint!T)
       foreach(i; taskPool.parallel(iota(nBlocks)))
         eta[i] += offset[i];
     }
+    etaBlock = eta;
     auto mu = link.linkinv(dataType, eta);
+    muBlock = mu;
     
     auto nStore = taskPool.workerLocalStorage(cast(ulong)0);
     auto gradStore = taskPool.workerLocalStorage(zerosColumn!T(p));
@@ -576,11 +586,12 @@ if(isFloatingPoint!T)
       ++iter;
       if(iter >= maxit)
       {
-        writeln("Maximum number of line search iterations exceeded.");
+        writeln("Maximum number of line search iterations reached.");
         exitCode = 1;
         return alpha;
       }
     }
+    //writeln("Evaluations of line search loop: ", iter);
     exitCode = 0;
     return alpha;
   }
@@ -608,7 +619,7 @@ if(isFloatingPoint!T)
       ++iter;
       if(iter >= maxit)
       {
-        writeln("Maximum number of line search iterations exceeded.");
+        writeln("Maximum number of line search iterations reached.");
         exitCode = 1;
         return alpha;
       }
@@ -641,7 +652,7 @@ if(isFloatingPoint!T)
       ++iter;
       if(iter >= maxit)
       {
-        writeln("Maximum number of line search iterations exceeded.");
+        writeln("Maximum number of line search iterations reached.");
         exitCode = 1;
         return alpha;
       }
@@ -664,6 +675,8 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
   ulong m; /* Number of recent {sk, yk} pairs to keep */
   ulong idx; /* Number of valid vectors so far */
   ulong iter; /* Iteration */
+  immutable(T) epsilon;
+  bool calcAlpha0; /* Whether alpha0 should be calculated or just set to 1 at each line search iteration */
   ColumnVector!(T) coef;
   ColumnVector!(T) coefold;
   ColumnVector!(T) rho;
@@ -671,21 +684,21 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
   Matrix!(T, layout) sm; /* Each column denotes the respective vector sk */
   Matrix!(T, layout) ym; /* Each column denotes the respective vector yk */
   
-  this(ulong p, ulong _m)
+  this(ulong p, ulong _m, T _epsilon = 1E-5, bool _calcAlpha0 = false)
   {
     m = _m; idx = 0; rho = new ColumnVector!(T)(m);
     iter = 1; sm = zerosMatrix!(T, layout)(p, m);
     ym = zerosMatrix!(T, layout)(p, m);
-    coef = zerosColumn!(T)(p);
-    coefold = zerosColumn!(T)(p);
+    coef = zerosColumn!(T)(p); coefold = zerosColumn!(T)(p);
+    epsilon = _epsilon; calcAlpha0 = _calcAlpha0;
   }
-  this(ColumnVector!(T) _coef, ulong p, ulong _m)
+  this(ColumnVector!(T) _coef, ulong p, ulong _m, T _epsilon = 1E-5, bool _calcAlpha0 = false)
   {
     m = _m; idx = 0; rho = new ColumnVector!(T)(m);
     iter = 1; sm = zerosMatrix!(T, layout)(p, m);
     ym = zerosMatrix!(T, layout)(p, m);
-    coef = _coef.dup;
-    coefold = _coef.dup;
+    coef = _coef.dup; coefold = _coef.dup;
+    epsilon = _epsilon; calcAlpha0 = _calcAlpha0;
   }
   /* Refactor this solve function */
   ColumnVector!(T) solve(RegularData dataType, 
@@ -696,54 +709,55 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
                ColumnVector!T weights = zerosColumn!(T)(0), 
                ColumnVector!T offset = zerosColumn!(T)(0))
   {
-    writeln("Iteration: ", iter);
-    writeln("idx: ", idx);
-    writeln("check S: ", sm);
-    writeln("check S: ", ym);
+    //writeln("Iteration: ", iter);
+    //writeln("idx: ", idx);
+    //writeln("Check S: ", sm);
+    //writeln("Check Y: ", ym);
     auto sk = cast(ColumnVector!(T))sm.columnSelect(idx);
     auto yk = cast(ColumnVector!(T))ym.columnSelect(idx);
     auto H0 = dotSum!(T)(sk, yk)/dotSum!(T)(yk, yk);
-    writeln("H0: ", H0);
+    //writeln("H0: ", H0);
     /**************** Algorithm 7.4 Start ****************/
     auto dF = new Gradient!(double)();
-    /*
-      You may want to include coef inside this solver in the future?
-    */
+
     //auto coef = _coef.dup;
     //auto coefold = _coef.dup;
     auto grad = dF.gradient(dataType, distrib, link,
                 coef, y, x, offset);
-    writeln("Algo 7.4 gradient: ", grad.array);
+    //writeln("Algo 7.4 gradient: ", grad.array);
     auto q = grad.dup;
     auto alphai = new ColumnVector!(T)(m);
     
-    for(ulong i = 0; i < (idx + 1); ++i)
+    for(long i = 0; i < (idx + 1); ++i)
     {
       sk = cast(ColumnVector!(T))sm.columnSelect(i);
       yk = cast(ColumnVector!(T))ym.columnSelect(i);
-      writeln("i: ", i, ", sk: ", sk.array);
-      writeln("i: ", i, ", yk: ", yk.array);
+      //writeln("i: ", i, ", sk: ", sk.array);
+      //writeln("i: ", i, ", yk: ", yk.array);
       alphai[i] = rho[i]*dotSum!(T)(sk, q);
       q -= alphai[i]*yk;
     }
-    writeln("q: ", q.array);
+    //writeln("q: ", q.array);
 
     pk = H0*q;
-    for(ulong i = idx; i > 0; --i)
+    for(long i = idx; i >= 0; --i)
     {
-      writeln("i: ", i, ", idx: ", idx);
+      //writeln("i: ", i);
       sk = cast(ColumnVector!(T))sm.columnSelect(i);
       yk = cast(ColumnVector!(T))ym.columnSelect(i);
+      //writeln("i: ", i, ", sk: ", sk.array);
+      //writeln("i: ", i, ", yk: ", yk.array);
       auto beta = rho[i]*dotSum!(T)(yk, pk);
       pk = pk + sk*(alphai[i] - beta);
     }
-    writeln("Output direction (pk): ", pk.array);
+    //writeln("Output direction (pk): ", pk.array);
     /**************** Algorithm 7.4 End ****************/
+    pk *= -1;
 
     /* Line Search */
     auto alpha = linesearch.linesearch(dataType, distrib, 
                     link, pk, coef, y, x, weights, offset);
-    writeln("Alpha: ", alpha);
+    //writeln("Alpha: ", alpha);
     coefold = coef.dup;
     coef += alpha*pk;
     idx = min(idx + 1, m - 1);
@@ -752,11 +766,11 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
     grad = dF.gradient(dataType, distrib, link,
                 coef, y, x, offset);
     
-    writeln("coef: ", coef.array);
-    writeln("coefold: ", coefold.array);
-    writeln("grad: ", grad.array);
-    writeln("gradold: ", gradold.array);
-    if(iter > m)
+    //writeln("coef: ", coef.array);
+    //writeln("coefold: ", coefold.array);
+    //writeln("grad: ", grad.array);
+    //writeln("gradold: ", gradold.array);
+    if(iter >= m)
     {
       sk = coef - coefold;
       yk = grad - gradold;
@@ -764,8 +778,10 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
       /* Removing first and Append new columns */
       sm.refColumnRemove(0);
       ym.refColumnRemove(0);
-      ym.appendColumn(yk);
       sm.appendColumn(sk);
+      ym.appendColumn(yk);
+      //writeln("Updated S: ", sm);
+      //writeln("Updated Y: ", ym);
     }else{
       sk = coef - coefold;
       yk = grad - gradold;
@@ -790,41 +806,36 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
     auto sk = cast(ColumnVector!(T))sm.columnSelect(idx);
     auto yk = cast(ColumnVector!(T))ym.columnSelect(idx);
     auto H0 = dotSum!(T)(sk, yk)/dotSum!(T)(yk, yk);
-    //writeln("H0: ", H0);
     /**************** Algorithm 7.4 Start ****************/
     auto dF = new Gradient!(double)();
-    //auto coef = _coef.dup;
-    //auto coefold = _coef.dup;
     auto grad = dF.gradient(dataType, distrib, link,
                 coef, y, x, offset);
-    //writeln("Gradient Calculated: ", grad.array);
     auto q = grad.dup;
     auto alphai = new ColumnVector!(T)(m);
-    //writeln("Stop Point 1");
-    for(ulong i = 0; i < (idx + 1); ++i)
+    
+    for(long i = 0; i < (idx + 1); ++i)
     {
       sk = cast(ColumnVector!(T))sm.columnSelect(i);
       yk = cast(ColumnVector!(T))ym.columnSelect(i);
       alphai[i] = rho[i]*dotSum!(T)(sk, q);
       q -= alphai[i]*yk;
     }
-    //writeln("Stop Point 2");
+
     pk = H0*q;
-    for(ulong i = idx; i > 0; --i)
+    for(long i = idx; i >= 0; --i)
     {
-      //writeln("i: ", i, ", idx: ", idx);
       sk = cast(ColumnVector!(T))sm.columnSelect(i);
       yk = cast(ColumnVector!(T))ym.columnSelect(i);
       auto beta = rho[i]*dotSum!(T)(yk, pk);
       pk = pk + sk*(alphai[i] - beta);
     }
-    //writeln("Stop Point 3");
     /**************** Algorithm 7.4 End ****************/
+    pk *= -1;
 
     /* Line Search */
     auto alpha = linesearch.linesearch(dataType, distrib, 
                     link, pk, coef, y, x, weights, offset);
-    //writeln("Alpha: ", alpha);
+    coefold = coef.dup;
     coef += alpha*pk;
     idx = min(idx + 1, m - 1);
 
@@ -832,18 +843,19 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
     grad = dF.gradient(dataType, distrib, link,
                 coef, y, x, offset);
     
-    if(iter > m)
+    if(iter >= m)
     {
-      /* Remove the first column */
-      sm.refColumnRemove(0);
       sk = coef - coefold;
       yk = grad - gradold;
-      /* Append new columns */
-      ym.appendColumn(yk);
+      rho[idx] = 1/dotSum!(T)(yk, sk);
+      sm.refColumnRemove(0);
+      ym.refColumnRemove(0);
       sm.appendColumn(sk);
+      ym.appendColumn(yk);
     }else{
       sk = coef - coefold;
       yk = grad - gradold;
+      rho[idx] = 1/dotSum!(T)(yk, sk);
       ym.refColumnAssign(yk, idx);
       sm.refColumnAssign(sk, idx);
     }
@@ -864,41 +876,36 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
     auto sk = cast(ColumnVector!(T))sm.columnSelect(idx);
     auto yk = cast(ColumnVector!(T))ym.columnSelect(idx);
     auto H0 = dotSum!(T)(sk, yk)/dotSum!(T)(yk, yk);
-    //writeln("H0: ", H0);
     /**************** Algorithm 7.4 Start ****************/
     auto dF = new Gradient!(double)();
-    /* auto coef = _coef.dup;
-    auto coefold = _coef.dup; */
     auto grad = dF.gradient(dataType, distrib, link,
                 coef, y, x, offset);
-    //writeln("Gradient Calculated: ", grad.array);
     auto q = grad.dup;
     auto alphai = new ColumnVector!(T)(m);
-    //writeln("Stop Point 1");
-    for(ulong i = 0; i < (idx + 1); ++i)
+    
+    for(long i = 0; i < (idx + 1); ++i)
     {
       sk = cast(ColumnVector!(T))sm.columnSelect(i);
       yk = cast(ColumnVector!(T))ym.columnSelect(i);
       alphai[i] = rho[i]*dotSum!(T)(sk, q);
       q -= alphai[i]*yk;
     }
-    //writeln("Stop Point 2");
+
     pk = H0*q;
-    for(ulong i = idx; i > 0; --i)
+    for(long i = idx; i >= 0; --i)
     {
-      //writeln("i: ", i, ", idx: ", idx);
       sk = cast(ColumnVector!(T))sm.columnSelect(i);
       yk = cast(ColumnVector!(T))ym.columnSelect(i);
       auto beta = rho[i]*dotSum!(T)(yk, pk);
       pk = pk + sk*(alphai[i] - beta);
     }
-    //writeln("Stop Point 3");
     /**************** Algorithm 7.4 End ****************/
+    pk *= -1;
 
     /* Line Search */
     auto alpha = linesearch.linesearch(dataType, distrib, 
                     link, pk, coef, y, x, weights, offset);
-    //writeln("Alpha: ", alpha);
+    coefold = coef.dup;
     coef += alpha*pk;
     idx = min(idx + 1, m - 1);
 
@@ -906,18 +913,19 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
     grad = dF.gradient(dataType, distrib, link,
                 coef, y, x, offset);
     
-    if(iter > m)
+    if(iter >= m)
     {
-      /* Remove the first column */
-      sm.refColumnRemove(0);
       sk = coef - coefold;
       yk = grad - gradold;
-      /* Append new columns */
-      ym.appendColumn(yk);
+      rho[idx] = 1/dotSum!(T)(yk, sk);
+      sm.refColumnRemove(0);
+      ym.refColumnRemove(0);
       sm.appendColumn(sk);
+      ym.appendColumn(yk);
     }else{
       sk = coef - coefold;
       yk = grad - gradold;
+      rho[idx] = 1/dotSum!(T)(yk, sk);
       ym.refColumnAssign(yk, idx);
       sm.refColumnAssign(sk, idx);
     }
@@ -933,6 +941,7 @@ auto glm(T, CBLAS_LAYOUT layout = CblasColMajor)(
        Matrix!(T, layout) _y, AbstractDistribution!(T) distrib,
        AbstractLink!(T) link, LBFGSSolver!(T, layout) solver,
        AbstractLineSearch!(T, layout) linesearch,
+       AbstractInverse!(T, layout) inverse = new GETRIInverse!(T, layout)(),
        Control!T control = new Control!T(),
        bool calculateCovariance = true, 
        ColumnVector!(T) offset = zerosColumn!(T)(0),
@@ -941,12 +950,13 @@ if(isFloatingPoint!(T))
 {
   auto init = distrib.init(new GradientDescent!(T, layout)(1), _y, weights);
   auto y = init[0]; weights = init[1];
-
+  
   // Initialize with link function
-  solver.coef[0] = mean(link.linkfun(y).array);
-  writeln("Initial coefficients: ", solver.coef.array);
+  //solver.coef[0] = mean(link.linkfun(y).array);
+  //writeln("Initial coefficients: ", solver.coef.array);
   
   bool converged, badBreak, doOffset, doWeights;
+  converged = true;
   
   if(offset.len != 0)
     doOffset = true;
@@ -962,16 +972,16 @@ if(isFloatingPoint!(T))
   auto dev = deviance.deviance(dataType, distrib, link, 
                   solver.coef, y, x, weights, offset);
   auto devold = dev;
-
+  
   /* Gradient descent with line search for first iteration */
   auto alphaInit = linesearch.linesearch(dataType, distrib, 
                     link, grad, solver.coef, y, x, weights, 
                     offset);
-  writeln("Alpha init: ", alphaInit);
+  //writeln("Alpha init: ", alphaInit);
   solver.coefold = solver.coef.dup;
   auto dir = alphaInit*grad;
   solver.coef += dir;
-
+  
   dev = deviance.deviance(dataType, distrib, link, 
                   solver.coef, y, x, weights, offset);
   grad = gradient.gradient(dataType, distrib, link,
@@ -979,59 +989,122 @@ if(isFloatingPoint!(T))
   
   auto sk = solver.coef - solver.coefold;
   auto yk = grad - gradold;
-
-  solver.ym.refColumnAssign(yk, 0);
+  
   solver.sm.refColumnAssign(sk, 0);
+  solver.ym.refColumnAssign(yk, 0);
   solver.rho[0] = 1/dotSum!(T)(yk, sk);
-
-  T alpha0 = 1; //2*(dev - devold)/dotSum!(T)(grad, dir);
-  //writeln("Check the first alpha0: ", alpha0);
-
-  linesearch.setAlpha0(1);
+  
+  T alpha0;
+  if(solver.calcAlpha0)
+  {
+    alpha0 = 2*(dev - devold)/dotSum!(T)(grad, dir);
+    alpha0 = alpha0 > 0 ? alpha0 : 1; /* Sanity check */
+    alpha0 = min(1, alpha0*1.01);
+    //writeln("The first alpha0: ", alpha0);
+  }else{
+    alpha0 = 1;
+  }
+  
+  linesearch.setAlpha0(alpha0);
   solver.solve(dataType, linesearch, distrib, link, 
             y, x, weights, offset);
-
+  
   auto absErr = T.infinity;
   auto relErr = T.infinity;
-
+  auto gradErr = T.infinity;
+  
   devold = dev;
   dev = deviance.deviance(dataType, distrib, link, 
                   solver.coef, y, x, weights, offset);
   
-  writeln("Dev: ", dev, ", devold: ", devold);
-  
+  //writeln("Dev: ", dev, ", devold: ", devold);
+
+  gradold = grad.dup;
+  grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
+  //writeln("Refreshed old gradient: ", gradold.array);
+  //writeln("Refreshed gradient: ", grad.array);
+
   absErr = absoluteError(dev, devold);
   relErr = relativeError(dev, devold);
-
+  gradErr = norm(grad);//relativeError(grad, gradold);
+  
   while(true)
   {
-    if(relErr > control.epsilon)
+    //writeln("Relative error: ", relErr);
+    //writeln("Gradient norm: ", gradErr);
+    if((relErr < control.epsilon) & (gradErr < solver.epsilon))
       break;
     
-    grad = gradient.gradient(dataType, distrib, link,
-                solver.coef, y, x, offset);
-    alpha0 = 2*(dev - devold)/dotSum!(T)(grad, solver.pk);
-    //writeln("Check the alpha0: ", alpha0);
-    
-    linesearch.setAlpha0(1);
+    if(solver.calcAlpha0)
+    {
+      alpha0 = 2*(dev - devold)/dotSum!(T)(grad, solver.pk);
+      alpha0 = alpha0 > 0 ? alpha0 : 1; /* Sanity check */
+      alpha0 = min(1, alpha0*1.01);
+      //writeln("Check alpha0: ", alpha0);
+    }else{
+      alpha0 = 1;
+    }
+        
+    linesearch.setAlpha0(alpha0);
     solver.solve(dataType, linesearch, distrib, link, 
               y, x, weights, offset);
     
     devold = dev;
     dev = deviance.deviance(dataType, distrib, link, 
                     solver.coef, y, x, weights, offset);
+    //writeln("Deviance: ", dev);
+    //writeln("Deviance Old: ", devold);
+    gradold = grad.dup;
+    grad = gradient.gradient(dataType, distrib, link,
+                solver.coef, y, x, offset);
     
     absErr = absoluteError(dev, devold);
     relErr = relativeError(dev, devold);
-
+    gradErr = norm(grad);//relativeError(grad, gradold);
+    
     if(control.maxit < solver.iter)
     {
       converged = false;
       break;
     }
   }
-  
-  return solver;
+
+  T phi = 1; long p = x.ncol; long n = x.nrow;
+  Matrix!(T, layout) cov, xw, xwx, R;
+  if(calculateCovariance)
+  {
+    auto mu = gradient.muRegular;
+    auto eta = gradient.etaRegular;
+    auto z = link.Z(y, mu, eta);
+    
+    if(doOffset)
+      z = map!( (x1, x2) => x1 - x2 )(z, offset);
+    
+    auto W = new Weights!(T, layout)();
+    /* Weights calculation standard vs sqrt */
+    auto w = W.W(dataType, distrib, link, mu, eta);
+    
+    if(doWeights)
+      w = map!( (x1, x2) => x1*x2 )(w, weights);
+    
+    //writeln("Coefficients: ", coef.array);
+    
+    auto XWX = new XWX!(T, layout)();
+    XWX.XWX(dataType, xwx, xw, x, z, w);
+    
+    cov = inverse.inv(xwx);
+    
+    if(!unitDispsersion!(T, typeof(distrib)))
+    {
+      phi = dev/(n - p);
+      imap!( (T x) => x*phi)(cov);
+    }
+  }else{
+    cov = fillMatrix!(T)(1, p, p);
+  }
+  auto obj = new GLM!(T, layout)(solver.iter, converged, phi, distrib, link, solver.coef, cov, dev, absErr, relErr);
+  return obj;
 }
 
 

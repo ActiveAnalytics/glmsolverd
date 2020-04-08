@@ -180,7 +180,6 @@ T dotSum(T)(Vector!(T) x, Vector!(T) y)
   return ret;
 }
 
-
 auto onesColumn(T)(ulong n)
 {
   return fillColumn!(T)(cast(T)1, n);
@@ -192,7 +191,7 @@ RowVector!(T) rowVector(T)(T[] data)
 T sum(T)(Vector!T v)
 if(isNumeric!T)
 {
-  return fold!((a, b) => a + b)(v.getData);
+  return fold!((a, b) => a + b)(v.array);
 }
 T[] createRandomArray(T = double)(ulong m)
 {

@@ -194,12 +194,12 @@ double norm(int incr = 1)(double[] x)
 {
 	return cblas_dnrm2(cast(int)x.length, x.ptr , incr);
 }
-double norm(T, int incr = 1)(ColumnVector!T x)
+double norm(T, int incr = 1)(Vector!T x)
 if(is(T == double))
 {
   return cblas_dnrm2(cast(int)x.length, x.array.ptr , incr);
 }
-double norm(T, int incr = 1)(ColumnVector!T x)
+double norm(T, int incr = 1)(Vector!T x)
 if((!is(T == double)) && isNumeric!T)
 {
   T ret = 0; ulong n = x.length;

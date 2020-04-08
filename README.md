@@ -96,6 +96,9 @@ can be tried out. Link Functions:
               maybe introduce Julia style expressions `@.` as a property or just use map - which will need to be modified for variadic vector/matrix inputs.
     - [ ] (c) Tidy up libraraies, arrays needs to be split into classes,
               convenience functions, and push the random stuff into sample.d. Need to split up linear algebra into matrix operations and solvers, get rid of old solvers and function that are no longer used like VanillaSolver and so forth.
+    - [ ] (d) Iron out function parameter input order e.g. weights and offsets
+              must be in the same order in a function and its sub-functions
+    - [ ] (e) Simple but replace `ulong` with `long`.
 - [ ] 3. Implement memory and disk blocked matrix structure in and
          integrate them with your current algorithm. Creating a generic interface that could contend with any data structure with the right methods returning the right types to the function(s).
 - [ ] 4. Implement or adapt the current GLM algorithm to work with the memory and disk based blocked matrix data structures - Done for memory.

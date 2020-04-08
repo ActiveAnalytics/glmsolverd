@@ -200,11 +200,12 @@ void lbfgsTest()
   
   auto lbfgs = new LBFGSSolver!(double)(gammaX.ncol, 5);
   auto ls = new BackTrackingLineSearch!(double)();
-  auto regOutput = glm!(double)(new RegularData(), gammaX, 
-       cast(Matrix!(double, CblasColMajor))gammaY, distrib, link, 
-       lbfgs, ls, new Control!(double)(), true,  nullVector, nullVector);
-  auto glmModel = glm!(double)(new RegularData(), gammaX, gammaY, 
+  auto glmModel = glm!(double)(new RegularData(), gammaX, 
+       gammaY, distrib, link, lbfgs, ls, new GETRIInverse!(double)(), 
+       new Control!(double)(), true,  nullVector, nullVector);
+  writeln("\nLBFGS GLMModel using regular data: ", glmModel);
+  glmModel = glm!(double)(new RegularData(), gammaX, gammaY, 
         distrib, link, new GESVSolver!(double)(), new GETRIInverse!(double)());
-  writeln("\nGLMModel comparison: ", glmModel);
+  writeln("\nStandard GLMModel using regular data: ", glmModel);
 }
 

@@ -237,10 +237,10 @@ mixin template MatrixGubbings(T, CBLAS_LAYOUT L)
     return dim[1];
   }
   /* Retire this method */
-  @property T[] getData()
-  {
-    return data;
-  }
+  //@property T[] getData()
+  //{
+  //  return data;
+  //}
   @property T[] array()
   {
     return data;
@@ -629,7 +629,7 @@ interface Vector(T)
   T opIndex(ulong i) const;
   void opIndexAssign(T x, ulong i);
   void opIndexOpAssign(string op)(T x, ulong i);
-  @property T[] getData();
+  //@property T[] getData();
   @property T[] array();
   Matrix!(T, layout) opCast(M: Matrix!(T, layout), CBLAS_LAYOUT layout)();
 }
@@ -666,10 +666,10 @@ mixin template VectorGubbings(T)
       mixin("return data[i] " ~ op ~ "= x;");
     else static assert(0, "Operator "~ op ~" not implemented");
   }
-  @property T[] getData()
-  {
-    return data;
-  }
+  //@property T[] getData()
+  //{
+  //  return data;
+  //}
   @property T[] array()
   {
     return data;
