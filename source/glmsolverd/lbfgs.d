@@ -8,7 +8,7 @@ import std.traits: isFloatingPoint, isIntegral, isNumeric;
 import std.parallelism;
 import std.range: iota;
 
-import std.math: pow, sgn;
+import std.math: abs, isNaN, pow, sgn;
 import std.algorithm: min, max;
 import std.algorithm.iteration: mean;
 
@@ -582,10 +582,15 @@ if(isFloatingPoint!T)
       auto devNew = f.deviance(dataType, distrib, link, coefNew, y, x, 
                           weights, offset);
       auto deriv = df.gradient(dataType, distrib, link, coef, y, x, offset);
+      
+      //writeln("Debug print from line search, dev: ", dev, ", devNew: ", devNew);
+
       if(devNew <= dev + c*alpha*dotSum!(T)(deriv, dir))
         break;
+      
       alpha *= rho;
       ++iter;
+      
       if(iter >= maxit)
       {
         writeln("Maximum number of line search iterations reached.");
@@ -661,6 +666,190 @@ if(isFloatingPoint!T)
     }
     exitCode = 0;
     return alpha;
+  }
+}
+
+class WolfeLineSearch(T, CBLAS_LAYOUT layout = CblasColMajor): AbstractLineSearch!(T, layout)
+{
+  private:
+  T alphaMax;
+  T alphaStart;
+  immutable(T) c1;
+  immutable(T) c2;
+  immutable(long) maxit;
+  long exitCode;
+  
+  public:
+  this(T _alpha = 1, T _alphaMax = 5, T _c1 = 1E-4, 
+          T _c2 = 0.9, long _maxit = 25)
+  {
+    alphaMax = _alphaMax;
+    c1 = _c1; c2 = _c2; maxit = _maxit;
+    exitCode = -1; alphaStart = _alpha;
+  }
+  void setAlpha0(T alpha)
+  {
+    alphaStart = alpha;
+  }
+  
+  T zoom(RegularData dataType, T alphaLo, T alphaHi, T phi0, T dphi0, 
+        AbstractDistribution!T distrib, AbstractLink!T link, 
+        ColumnVector!T dir, ColumnVector!(T) coef, 
+        ColumnVector!T y, Matrix!(T, layout) x, 
+        ColumnVector!T weights = zerosColumn!(T)(0), 
+        ColumnVector!T offset = zerosColumn!(T)(0))
+  {
+    assert(alphaLo < alphaHi, "alphaLo: " ~ to!(string)(alphaLo) ~ " is not less than alphaHi: " ~ to!(string)(alphaHi) ~ ".");
+    auto interp = new Interpolation!(T)();
+    auto F = new Deviance!(T, layout)();
+    auto dF = new Gradient!(T, layout);
+    long iter = 1;
+    while(true)
+    {
+      auto delta = alphaLo*dir;
+      auto coefLo = coef + delta;
+      auto phiLo = F.deviance(dataType, distrib, link, coefLo, y, x, 
+                      weights, offset);
+      auto gradLo = dF.gradient(dataType, distrib, link, coefLo, 
+                      y, x, offset);
+      auto dphiLo = dotSum!(T)(gradLo, dir);
+      
+      delta = alphaLo*dir;
+      auto coefHi = coef + delta;
+      auto phiHi = F.deviance(dataType, distrib, link, coefHi, y, x, 
+                      weights, offset);
+      auto gradHi = dF.gradient(dataType, distrib, link,
+                            coefHi, y, x, offset);
+      auto dphiHi = dotSum!(T)(gradHi, dir);
+      
+      writeln("alphaLo: ", alphaLo, ", alphaHi: ", alphaHi);
+      T alpha = interp.cubic(alphaLo, alphaHi, phiLo, phiHi, dphiLo, dphiHi);
+      writeln("zoom() iteration: ", iter, ", Current alpha: ", alpha);
+      delta = alpha*dir;
+      auto coefNew = coef + delta;
+      T phiNew = F.deviance(dataType, distrib, link, coefNew, 
+                      y, x, weights, offset);
+      if((phiNew > phi0 + c1*alpha*dphi0) | (phiNew >= phiLo))
+      {
+        writeln("From zoom(): failed wolfe condition: phiNew: ", phiNew, ", phiCheck: ", phi0+ c1*alpha*dphi0, ", phiLo: ", phiLo);
+        alphaHi = alpha;
+      }else{
+        auto gradNew = dF.gradient(dataType, distrib, link,
+                            coefNew, y, x, offset);
+        T dphiNew = dotSum!(T)(gradNew, dir);
+        if(abs(dphiNew) <= -c2*dphi0)
+        {
+          exitCode = 0;
+          return alpha;
+        }
+        if(dphiNew*(alphaHi - alphaLo) >= 0)
+        {
+          alphaHi = alphaLo;
+        }
+        alphaLo = alpha;
+      }
+      if(iter >= maxit)
+      {
+        writeln("Maximum number of zoom iterations reached.");
+        exitCode = 1;
+        return alpha;
+      }
+      ++iter;
+    }
+  }
+
+  T linesearch(RegularData dataType, AbstractDistribution!T distrib, 
+               AbstractLink!T link, ColumnVector!T dir, 
+               ColumnVector!(T) coef, ColumnVector!T y, Matrix!(T, layout) x,
+               ColumnVector!T weights = zerosColumn!(T)(0), 
+               ColumnVector!T offset = zerosColumn!(T)(0))
+  {
+    auto F = new Deviance!(T, layout)();
+    auto dF = new Gradient!(T, layout);
+    long iter = 1;
+    /* alpha_{i - 1}, alpha_{i}, alpha_{i + 1} */
+    T[2] alpha = new T[2]; T[2] phi = new T[2];
+    alpha[0] = 0; alpha[1] = alphaStart;
+    //writeln("alphaStart: ", alpha[1]);
+    auto phi0 = F.deviance(dataType, distrib, link, coef, y, x, 
+                          weights, offset);
+    auto grad0 = dF.gradient(dataType, distrib, link, coef, y, x, offset);
+    auto dphi0 = dotSum!(T)(grad0, dir);
+    writeln("coef: ", coef.array);
+    while(true)
+    {
+      writeln("Line search iteration: ", iter);
+      auto delta = alpha[1]*dir;
+      writeln("dir: ", dir.array);
+      auto coefi = coef + delta;
+      auto tmp = F.deviance(dataType, distrib, link, coefi, 
+                      y, x, weights, offset);
+      phi[0] = phi[1]; phi[1] = tmp;
+      writeln("alpha at top of loop: ", alpha);
+      writeln("phi at top of loop: ", phi);
+      writeln("phi0 at top of loop: ", phi0);
+      writeln("dphi0 at top of loop: ", dphi0);
+      if((phi[1] > phi0 + c1*alpha[1]*dphi0) | ((iter > 1) && (phi[1] >= phi[0])))
+      {
+        writeln("zoom() call 1");
+        exitCode = 0;
+        alpha[1] = zoom(dataType, alpha[0], alpha[1], phi0, dphi0, distrib, 
+                      link, dir, coef, y, x, weights, offset);
+        writeln("alpha exit: ", alpha[1]);
+        return alpha[1];
+      }
+      auto gradi = dF.gradient(dataType, distrib, link, coefi, y, x, offset);
+      auto dphii = dotSum!(T)(gradi, dir);
+      if(abs(dphii) <= -c2*dphi0)
+      {
+        exitCode = 0;
+        return alpha[1];
+      }
+      if(dphii >= 0)
+      {
+        writeln("zoom() call 2, dphii: ", dphii);
+        /* delete this hack */
+        if(alpha[1] > alpha[0])
+        {
+          writeln("Line search hack swap");
+          auto tmp0 = alpha[0];
+          alpha[0] = alpha[1];
+          alpha[1] = tmp0;
+        }
+        exitCode = 0;
+        alpha[1] = zoom(dataType, alpha[1], alpha[0], phi0, dphi0, distrib, 
+                      link, dir, coef, y, x, weights, offset);
+        writeln("alpha exit: ", alpha[1]);
+        return alpha[1];
+      }
+      alpha[0] = alpha[1];
+      alpha[1] = alpha[1] + 0.5*(alphaMax - alpha[1]);
+      if(iter >= maxit)
+      {
+        writeln("Maximum number of line search iterations reached, alpha: ", alpha[1]);
+        exitCode = 1;
+        return alpha[1];
+      }
+      ++iter;
+    }
+  }
+
+  T linesearch(Block1D dataType, AbstractDistribution!T distrib, 
+               AbstractLink!T link, ColumnVector!T dir, 
+               ColumnVector!(T) coef, BlockColumnVector!T y, 
+               BlockMatrix!(T, layout) x, BlockColumnVector!T weights, 
+               BlockColumnVector!T offset)
+  {
+    return 0;
+  }
+  
+  T linesearch(Block1DParallel dataType, AbstractDistribution!T distrib, 
+               AbstractLink!T link, ColumnVector!T dir, 
+               ColumnVector!(T) coef, BlockColumnVector!T y, 
+               BlockMatrix!(T, layout) x, BlockColumnVector!T weights, 
+               BlockColumnVector!T offset)
+  {
+    return 0;
   }
 }
 
@@ -938,6 +1127,8 @@ class LBFGSSolver(T, CBLAS_LAYOUT layout = CblasColMajor)
   }
 }
 
+/* GLM Functions */
+/***********************************************************************/
 /**
   GLM function using LBFGS with Regular Data
 */
@@ -992,6 +1183,8 @@ if(isFloatingPoint!(T))
   grad = gradient.gradient(dataType, distrib, link,
                 solver.coef, y, x, offset);
   
+  writeln("GLM Dev (first): ", dev, ", devold: ", devold);
+  
   auto sk = solver.coef - solver.coefold;
   auto yk = grad - gradold;
   
@@ -1022,7 +1215,7 @@ if(isFloatingPoint!(T))
   dev = deviance.deviance(dataType, distrib, link, 
                   solver.coef, y, x, weights, offset);
   
-  //writeln("Dev: ", dev, ", devold: ", devold);
+  writeln("GLM Dev (second): ", dev, ", devold: ", devold);
 
   gradold = grad.dup;
   grad = gradient.gradient(dataType, distrib, link,
@@ -1058,8 +1251,9 @@ if(isFloatingPoint!(T))
     devold = dev;
     dev = deviance.deviance(dataType, distrib, link, 
                     solver.coef, y, x, weights, offset);
-    //writeln("Deviance: ", dev);
-    //writeln("Deviance Old: ", devold);
+    
+    writeln("GLM iteration: ", solver.iter, ", dev: ", dev, ", devold: ", devold);
+    
     gradold = grad.dup;
     grad = gradient.gradient(dataType, distrib, link,
                 solver.coef, y, x, offset);

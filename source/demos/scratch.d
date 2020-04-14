@@ -208,19 +208,25 @@ void lbfgsTest()
   writeln("\nStandard GLMModel using regular data: ", glmModel);
 
   glmModel = glm(new RegularData(), gammaX, 
-       gammaY, distrib, link, lbfgs, ls, inverse);
-  writeln("\nLBFGS GLMModel using regular data: ", glmModel);
-
+                  gammaY, distrib, link, lbfgs, ls, inverse);
+  writeln("\nLBFGS GLMModel with back-tracking line seach using regular data: ", glmModel);
+  
   lbfgs = new LBFGSSolver!(double)(p, 5);
   ls = new BackTrackingLineSearch!(double)();
   glmModel = glm(new Block1D(), gammaBlockX, 
-       gammaBlockY, distrib, link, lbfgs, ls, inverse);
-  writeln("\nLBFGS GLMModel with serial block1D data: ", glmModel);
-
+                  gammaBlockY, distrib, link, lbfgs, ls, inverse);
+  writeln("\nLBFGS GLMModel with back-tracking line seach using serial block1D data: ", glmModel);
+  
   lbfgs = new LBFGSSolver!(double)(p, 5);
   ls = new BackTrackingLineSearch!(double)();
   glmModel = glm(new Block1DParallel(), gammaBlockX, 
-       gammaBlockY, distrib, link, lbfgs, ls, inverse);
-  writeln("\nLBFGS GLMModel with parallel block1D data: ", glmModel);
+                gammaBlockY, distrib, link, lbfgs, ls, inverse);
+  writeln("\nLBFGS GLMModel with back-tracking line seach using parallel block1D data: ", glmModel);
+  
+  //lbfgs = new LBFGSSolver!(double)(p, 5);
+  //auto wls = new WolfeLineSearch!(double)();
+  //glmModel = glm(new RegularData(), gammaX, gammaY, distrib, link,
+  //              lbfgs, wls, inverse);
+  //writeln("\nLBFGS GLMModel with Wolfe line seach using regular data: ", glmModel);
 }
 
